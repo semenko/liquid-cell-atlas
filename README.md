@@ -21,7 +21,7 @@ To kick off this project, we've broken out key tasks into individual folders. On
         * Preprocessing pipeline (snakemake?)
         * Data aggregation & annotation
     * Data preprocessing
-        * Convert to [.pat](https://github.com/nloyfer/wgbs_tools/blob/master/docs/pat_format.md) or [.beta](https://github.com/nloyfer/wgbs_tools/blob/master/docs/beta_format.md)?
+        * Convert to [.pat](https://github.com/nloyfer/wgbs_tools/blob/master/docs/pat_format.md) (or [.beta](https://github.com/nloyfer/wgbs_tools/blob/master/docs/beta_format.md)?)
 * Modeling (Code)
     * Simple fingerprint models
     * Tensorflow-stored models
