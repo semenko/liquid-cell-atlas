@@ -1,5 +1,5 @@
 <div align="center">
- <img src="https://github.com/semenko/liquid-cell-atlas/blob/main/resources/docs/lca-logo.png?raw=true" width="300" height="300">
+ <img src="https://github.com/semenko/liquid-cell-atlas/blob/main/docs/lca-logo.png?raw=true" width="300" height="300">
  <h1><strong>Liquid Cell Atlas</strong></h1>
 
 [![Stars](https://img.shields.io/github/stars/semenko/liquid-cell-atlas?logo=GitHub&color=yellow)](https://github.com/semenko/liquid-cell-atlas/stargazers)
