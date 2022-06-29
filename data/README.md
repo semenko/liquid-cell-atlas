@@ -12,3 +12,7 @@ These directories contain code / scripts / pointers for raw data & pre-processin
   * raw
 
 ## License / Availablity
+
+Third party data (e.g. ENCODE and BLUEPRINT) are covered by their own 3rd party licenses.
+
+Our lab-generated data are available via *** and licensed under ***
