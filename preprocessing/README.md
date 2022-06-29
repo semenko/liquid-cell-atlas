@@ -5,6 +5,16 @@ A standardized WGBS pre-processing pipeline for our internally generated Bisulfi
 We take an opinionated stance on that pipeline and rip out lots of more general components (e.g. no fastq_screen, preseq, etc.)
 and enables lots of QC & filters (e.g. adapter trimming) by default. 
 
+## Running:
+
+1. Run `download_and_extract_reference.sh`
+    1. This downloads and extracts the Hg38 reference genomes via [Illumina iGenomes](https://support.illumina.com/sequencing/sequencing_software/igenome.html)
+1. Run ``
+    1. This establises a conda environment for snakemake
+    1. For simplicity, we do **not** include module/cluster support
+1. Test your installation by running ``
+1. Run on real data buy running ``
+
 
 ## Processing Steps
   + [run once] Generate asset files used during QC related rules
