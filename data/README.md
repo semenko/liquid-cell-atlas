@@ -10,6 +10,9 @@ These directories contain code / scripts / pointers for raw data & pre-processin
 * internal/
   * spike 
   * raw
+* reference/
+  * iGenomes (Illumina iGenomes data)
+  * biscuit
 
 ## License / Availablity
 
