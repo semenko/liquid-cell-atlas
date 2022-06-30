@@ -36,7 +36,7 @@ To kick off this project, we've broken out key tasks into individual folders. On
     * Stats & Graphs
 
 
-## Archiecture
+## Architecture
 
 ```mermaid
 graph TD;
