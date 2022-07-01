@@ -1,9 +1,6 @@
 # Raw Sequencing Preprocessing
 
-A standardized WGBS pre-processing pipeline for our internally generated Bisulfite & EM-seq data. This adapts [this Biscuit sample snakemake pipline](https://github.com/vari-bbc/Biscuit_Snakemake_Workflow/).
-
-We take an opinionated stance on that pipeline and rip out lots of more general components (e.g. no fastq_screen, preseq, etc.)
-and enables lots of QC & filters (e.g. adapter trimming) by default. 
+A standardized WGBS pre-processing pipeline for our internally generated Bisulfite & EM-seq data. This goes from .fastq -> methylation calls via Bismark, using Snakemake.
 
 ## Running:
 
@@ -32,6 +29,4 @@ and enables lots of QC & filters (e.g. adapter trimming) by default.
 
 
 ## License
-GPLv3
-
-NOTE: Preprocessing must be GPLv3 licensed, as it derives from the Biscuit sample WGBS pipeline noted above.
+MIT - derives some code from https://github.com/lyijin/bismsmark which is MIT licensed.
