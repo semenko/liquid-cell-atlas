@@ -1,0 +1,15 @@
+sample_id, method, description, path_R1, path_R2, internal_source 
+epcam_spike_25_pct_bsseq, bsseq, 25% EPCAM Spike, spike/BS-Spike-1_R1.fastq.gz, spike/BS-Spike-1_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_10_pct_bsseq, bsseq, 10% EPCAM Spike, spike/BS-Spike-2_R1.fastq.gz, spike/BS-Spike-2_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_5_pct_bsseq, bsseq, 5% EPCAM Spike, spike/BS-Spike-3_R1.fastq.gz, spike/BS-Spike-3_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_2.5_pct_bsseq, bsseq, 2.5% EPCAM Spike, spike/BS-Spike-4_R1.fastq.gz, spike/BS-Spike-4_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_1_pct_bsseq, bsseq, 1% EPCAM Spike, spike/BS-Spike-5_R1.fastq.gz, spike/BS-Spike-5_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_0.5_pct_bsseq, bsseq, 0.5% EPCAM Spike, spike/BS-Spike-6_R1.fastq.gz, spike/BS-Spike-6_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_0_pct_bsseq, bsseq, Unspiked, spike/BS-Spike-7_R1.fastq.gz, spike/BS-Spike-7_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_25_pct_emseq, emseq, 25% EPCAM Spike, spike/EM-Spike-1_R1.fastq.gz, spike/EM-Spike-1_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_10_pct_emseq, emseq, 10% EPCAM Spike, spike/EM-Spike-2_R1.fastq.gz, spike/EM-Spike-2_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_5_pct_emseq, emseq, 5% EPCAM Spike, spike/EM-Spike-3_R1.fastq.gz, spike/EM-Spike-3_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_2.5_pct_emseq, emseq, 2.5% EPCAM Spike, spike/EM-Spike-4_R1.fastq.gz, spike/EM-Spike-4_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_1_pct_emseq, emseq, 1% EPCAM Spike, spike/EM-Spike-5_R1.fastq.gz, spike/EM-Spike-5_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_0.5_pct_emseq, emseq, 0.5% EPCAM Spike, spike/EM-Spike-6_R1.fastq.gz, spike/EM-Spike-6_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
+epcam_spike_0_pct_emseq, emseq, Unspiked, spike/EM-Spike-7_R1.fastq.gz, spike/EM-Spike-7_R2.fastq.gz, /storage1/fs1/aadel/Active/abul/EM-seq_vs_BS-seq_spike/portal-us.medgenome.com/P2003465_02012022/FASTQ
