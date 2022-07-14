@@ -113,5 +113,4 @@ ENV/
 .floo
 .flooignore
 
-/data
 .vscode/settings.json
