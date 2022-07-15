@@ -35,29 +35,29 @@ Melanoma_YUEVRY_19.3935,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,63,0.315,,
 Melanoma_YUPARK_18.3856,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,37.5,0.1875,,
 Melanoma_YUPARK_18.3832,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,96.3,0.4815,,
 Melanoma_YUMORF_17.3654,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,214.9,1.0745,,
-Melanoma_1254-T_CD45-,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,784167,980
-Melanoma_1457-T_CD45-,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,284587,648
-Melanoma_1254,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,100,0.5,381398,996
-Melanoma_1254,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,632000,837.3333333
-Melanoma_1254,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,67.8,0.339,17460,67.8
-Melanoma_1254,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,100,0.5,50037,176.6
-Melanoma_1254,tumor,CD14,bsseq,,,,,,,medgenome,30x,7,81,0.405,15733,81
-Melanoma_1457,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,100,0.5,489611,1484
-Melanoma_1457,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,65518,157.6
-Melanoma_1457,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,101.4,0.507,39415,101.4
-Melanoma_1457,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,100,0.5,80210,187.8
-Melanoma_1457,tumor,CD14,bsseq,,,,,,,medgenome,30x,7,38.8,0.194,6629,38.8
-Melanoma_1340,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,25.5,0.1275,34561,25.5
-Melanoma_1340,tumor,CD45-,bsseq,,,,,,,medgenome,30x,8,33.2,0.166,42760,33.2
-Melanoma_960,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,60.31666667,0.301583333,14439,60.31666667
-Melanoma_960,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,52.73333333,0.263666667,12769,52.73333333
-Melanoma_960,tumor,CD14,bsseq,,,,,,,medgenome,30x,9,10.85,0.05425,2256,10.85
-Melanoma_139,pbmc,CD4,bsseq,,,,,,,medgenome,30x,7,100,0.5,257009,640
-Melanoma_139,pbmc,CD8,bsseq,,,,,,,medgenome,30x,7,100,0.5,369536,720
-Melanoma_139,pbmc,CD14,bsseq,,,,,,,medgenome,30x,7,100,0.5,276329,623.3333333
-Melanoma_167,pbmc,CD4,bsseq,,,,,,,medgenome,30x,7,100,0.5,125566,334.1666667
-Melanoma_167,pbmc,CD8,bsseq,,,,,,,medgenome,30x,7,100,0.5,94134,270
-Melanoma_167,pbmc,CD14,bsseq,,,,,,,medgenome,30x,7,100,0.5,146204,383.3333333
+Melanoma_1254-T_CD45pos,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,784167,980
+Melanoma_1457-T_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,284587,648
+Melanoma_1254_CD45pos,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,100,0.5,381398,996
+Melanoma_1254_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,632000,837.3333333
+Melanoma_1254_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,67.8,0.339,17460,67.8
+Melanoma_1254_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,100,0.5,50037,176.6
+Melanoma_1254_CD14,tumor,CD14,bsseq,,,,,,,medgenome,30x,7,81,0.405,15733,81
+Melanoma_1457_CD45pos,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,100,0.5,489611,1484
+Melanoma_1457_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,65518,157.6
+Melanoma_1457_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,101.4,0.507,39415,101.4
+Melanoma_1457_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,100,0.5,80210,187.8
+Melanoma_1457_CD14,tumor,CD14,bsseq,,,,,,,medgenome,30x,7,38.8,0.194,6629,38.8
+Melanoma_1340_CD45pos,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,25.5,0.1275,34561,25.5
+Melanoma_1340_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,8,33.2,0.166,42760,33.2
+Melanoma_960_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,60.31666667,0.301583333,14439,60.31666667
+Melanoma_960_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,52.73333333,0.263666667,12769,52.73333333
+Melanoma_960_CD14,tumor,CD14,bsseq,,,,,,,medgenome,30x,9,10.85,0.05425,2256,10.85
+Melanoma_139_CD4,pbmc,CD4,bsseq,,,,,,,medgenome,30x,7,100,0.5,257009,640
+Melanoma_139_CD8,pbmc,CD8,bsseq,,,,,,,medgenome,30x,7,100,0.5,369536,720
+Melanoma_139_CD14,pbmc,CD14,bsseq,,,,,,,medgenome,30x,7,100,0.5,276329,623.3333333
+Melanoma_167_CD4,pbmc,CD4,bsseq,,,,,,,medgenome,30x,7,100,0.5,125566,334.1666667
+Melanoma_167_CD8,pbmc,CD8,bsseq,,,,,,,medgenome,30x,7,100,0.5,94134,270
+Melanoma_167_CD14,pbmc,CD14,bsseq,,,,,,,medgenome,30x,7,100,0.5,146204,383.3333333
 Melanoma_123,pbmc,bulk,bsseq,,,,,,,medgenome,30x,7,100,0.5,,7634
 Melanoma_159,pbmc,bulk,bsseq,,,,,,,medgenome,30x,7,100,0.5,,6688
 Melanoma_YUMEDIC-14-3303,plasma,cfdna,emseq,,,,,,,medgenome,30x,8,10,0.05,,
