@@ -1,65 +1,65 @@
 ﻿sample_id,source,cell_type,method,description,path_R1,path_R2,md5sum_R1,md5sum_R2,internal_path,sequencing_facility,target_depth,indexing_pcr_cycles,ng_dna_for_prep,ng_unmethylated_lambda,sorted_cells,ng_sorted_dna
-Melanoma_YURICA_18.3814,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,205.2,1.026,,
-Melanoma_YURICA_18.3824,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,96.3,0.4815,,
-Melanoma_YUTORY_17.3688,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,82,0.41,,
-Melanoma_YUTORY_17.3706,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,75.8,0.379,,
-Melanoma_YUZIRG_17.3707,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,25.5,0.1275,,
-Melanoma_YUZIRG_17.3735,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,53.1,0.2655,,
-Melanoma_YUGRUS_19.3880,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,58.9,0.2945,,
-Melanoma_YUGRUS_19.3893,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,42.5,0.2125,,
-Melanoma_YUHEAL_19.3918,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,117.7,0.5885,,
-Melanoma_YUDONA_19.3920,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,182,0.91,,
-Melanoma_YUDONA_19.3938,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,182.5,0.9125,,
-Melanoma_YUMAXI_19.3879,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,29.2,0.146,,
-Melanoma_YUPRAF_19.3925,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,54.5,0.2725,,
-Melanoma_YUPRAF_19.3941,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,24,0.12,,
-Melanoma_YUTACI_17.3674,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,125.3,0.6265,,
-Melanoma_YUTACI_17.3685,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,115.6,0.578,,
-Melanoma_YUSMAL_17.3715,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,13,0.065,,
-Melanoma_YUSMAL_17.3737,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,23.8,0.119,,
-Melanoma_YUAMIGO_17.3703,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,21.1,0.1055,,
-Melanoma_YUAMIGO_17.3720,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,17.3,0.0865,,
-Melanoma_YULENIO_17.3694,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,26.5,0.1325,,
-Melanoma_YULENIO_17.3711,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,37.8,0.189,,
-Melanoma_YUCLUE_20-3998,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,52.3962,0.261981,,
-Melanoma_YUTAUR_19-3926,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,28.14912,0.1407456,,
-Melanoma_YUMICRO_20-4006,plasma,cfdna,bsseq,,,,,,,medgenome,30x,7,104.0616,0.520308,,
-Melanoma_YUSTRAW_20-4002,plasma,cfdna,bsseq,,,,,,,medgenome,30x,7,100,0.5,,
-Melanoma_YUTHEA_20-4000,plasma,cfdna,bsseq,,,,,,,medgenome,30x,7,100,0.5,,
-Melanoma_YUPRAF_19-3925,plasma,cfdna,bsseq,,,,,,,medgenome,30x,7,89.4672,0.447336,,
-Melanoma_YUMOTE_17-3755,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,32.82552,0.1641276,,
-Melanoma_YUREIL_17-3713,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,32.78016,0.1639008,,
-Melanoma_YUMARS_15-3443,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,44.28,0.2214,,
-Melanoma_YUVIRTUE_20-4029,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,34.87176,0.1743588,,
-Melanoma_YUEVRY_19.3935,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,63,0.315,,
-Melanoma_YUPARK_18.3856,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,37.5,0.1875,,
-Melanoma_YUPARK_18.3832,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,96.3,0.4815,,
-Melanoma_YUMORF_17.3654,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,214.9,1.0745,,
-Melanoma_1254-T_CD45pos,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,784167,980
-Melanoma_1457-T_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,284587,648
-Melanoma_1254_CD45pos,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,100,0.5,381398,996
-Melanoma_1254_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,632000,837.3333333
-Melanoma_1254_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,67.8,0.339,17460,67.8
-Melanoma_1254_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,100,0.5,50037,176.6
-Melanoma_1254_CD14,tumor,CD14,bsseq,,,,,,,medgenome,30x,7,81,0.405,15733,81
-Melanoma_1457_CD45pos,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,100,0.5,489611,1484
-Melanoma_1457_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,7,100,0.5,65518,157.6
-Melanoma_1457_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,101.4,0.507,39415,101.4
-Melanoma_1457_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,100,0.5,80210,187.8
-Melanoma_1457_CD14,tumor,CD14,bsseq,,,,,,,medgenome,30x,7,38.8,0.194,6629,38.8
-Melanoma_1340_CD45pos,tumor,CD45+,bsseq,,,,,,,medgenome,30x,7,25.5,0.1275,34561,25.5
-Melanoma_1340_CD45neg,tumor,CD45-,bsseq,,,,,,,medgenome,30x,8,33.2,0.166,42760,33.2
-Melanoma_960_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,60.31666667,0.301583333,14439,60.31666667
-Melanoma_960_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,,,,,,medgenome,30x,7,52.73333333,0.263666667,12769,52.73333333
-Melanoma_960_CD14,tumor,CD14,bsseq,,,,,,,medgenome,30x,9,10.85,0.05425,2256,10.85
-Melanoma_139_CD4,pbmc,CD4,bsseq,,,,,,,medgenome,30x,7,100,0.5,257009,640
-Melanoma_139_CD8,pbmc,CD8,bsseq,,,,,,,medgenome,30x,7,100,0.5,369536,720
-Melanoma_139_CD14,pbmc,CD14,bsseq,,,,,,,medgenome,30x,7,100,0.5,276329,623.3333333
-Melanoma_167_CD4,pbmc,CD4,bsseq,,,,,,,medgenome,30x,7,100,0.5,125566,334.1666667
-Melanoma_167_CD8,pbmc,CD8,bsseq,,,,,,,medgenome,30x,7,100,0.5,94134,270
-Melanoma_167_CD14,pbmc,CD14,bsseq,,,,,,,medgenome,30x,7,100,0.5,146204,383.3333333
-Melanoma_123,pbmc,bulk,bsseq,,,,,,,medgenome,30x,7,100,0.5,,7634
-Melanoma_159,pbmc,bulk,bsseq,,,,,,,medgenome,30x,7,100,0.5,,6688
+Melanoma_YURICA_18-3814,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,205.2,1.026,,
+Melanoma_YURICA_18-3824,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,96.3,0.4815,,
+Melanoma_YUTORY_17-3688,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,82,0.41,,
+Melanoma_YUTORY_17-3706,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,75.8,0.379,,
+Melanoma_YUZIRG_17-3707,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,25.5,0.1275,,
+Melanoma_YUZIRG_17-3735,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,53.1,0.2655,,
+Melanoma_YUGRUS_19-3880,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,58.9,0.2945,,
+Melanoma_YUGRUS_19-3893,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,42.5,0.2125,,
+Melanoma_YUHEAL_19-3918,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,117.7,0.5885,,
+Melanoma_YUDONA_19-3920,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,182,0.91,,
+Melanoma_YUDONA_19-3938,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,182.5,0.9125,,
+Melanoma_YUMAXI_19-3879,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,29.2,0.146,,
+Melanoma_YUPRAF_19-3925,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,54.5,0.2725,,
+Melanoma_YUPRAF_19-3941,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,24,0.12,,
+Melanoma_YUTACI_17-3674,plasma,cfdna,bsseq,,,,,,,medgenome,30x,12,125.3,0.6265,,
+Melanoma_YUTACI_17-3685,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,115.6,0.578,,
+Melanoma_YUSMAL_17-3715,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,13,0.065,,
+Melanoma_YUSMAL_17-3737,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,23.8,0.119,,
+Melanoma_YUAMIGO_17-3703,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,21.1,0.1055,,
+Melanoma_YUAMIGO_17-3720,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,17.3,0.0865,,
+Melanoma_YULENIO_17-3694,plasma,cfdna,bsseq,,,,,,,medgenome,30x,11,26.5,0.1325,,
+Melanoma_YULENIO_17-3711,plasma,cfdna,bsseq,,,,,,,medgenome,30x,9,37.8,0.189,,
+Melanoma_YUCLUE_20-3998,plasma,cfdna,bsseq,,YUCLUE_20-3998_R1.fastq.gz,YUCLUE_20-3998_R2.fastq.gz,23164874586b4794e83ebc19953c0d0a,c41ebc243d3b536dea7fc6817539b2d4,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,11,52.3962,0.261981,,
+Melanoma_YUTAUR_19-3926,plasma,cfdna,bsseq,,YUTAUR_19-3926_R1.fastq.gz,YUTAUR_19-3926_R2.fastq.gz,07fca6284142370df71ee3f35ec5f82e,82a02fb242fdae79935d7547ad21cc15,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,11,28.14912,0.1407456,,
+Melanoma_YUMICRO_20-4006,plasma,cfdna,bsseq,,YUMICRO_20-4006_R1.fastq.gz,YUMICRO_20-4006_R2.fastq.gz,1baa4ac8b42a76ebb0e4933c1bb1ee75,f57bac982e7e422f17f4488c67a53cfd,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,7,104.0616,0.520308,,
+Melanoma_YUSTRAW_20-4002,plasma,cfdna,bsseq,,YUSTRAW_20-4002_R1.fastq.gz,YUSTRAW_20-4002_R2.fastq.gz,1d51ce1f9d5ed42bed928a6c28bdfbff,77ca956f1722ff0ca359bc2aad098de3,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,7,100,0.5,,
+Melanoma_YUTHEA_20-4000,plasma,cfdna,bsseq,,YUTHEA_20-4000_R1.fastq.gz,YUTHEA_20-4000_R2.fastq.gz,3ecf7922803f5c2aee1c4aaf2b35a7a4,d3efd26bfa48c692a3d5c4c50309213e,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,7,100,0.5,,
+Melanoma_YUPRAF_19-3925,plasma,cfdna,bsseq,,YUPRAF_19-3925_R1.fastq.gz,YUPRAF_19-3925_R2.fastq.gz,22b1367f9fedad44df14867d9f98ba9a,2096a4ab1d09dbd1f5bde681accd30db,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,7,89.4672,0.447336,,
+Melanoma_YUMOTE_17-3755,plasma,cfdna,bsseq,,YUMOTE_17-3755_R1.fastq.gz,YUMOTE_17-3755_R2.fastq.gz,d9fbd098b528e5a19d7f2e72c67d8ba8,37534f4c0433706ad88eac3d340b7ae7,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,11,32.82552,0.1641276,,
+Melanoma_YUREIL_17-3713,plasma,cfdna,bsseq,,YUREIL_17-3713_R1.fastq.gz,YUREIL_17-3713_R2.fastq.gz,dc0f9e28efec9cab235f8c2ffb6106b7,b39d6bf3a897deb1b3769a43c5ef9dd3,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,11,32.78016,0.1639008,,
+Melanoma_YUMARS_15-3443,plasma,cfdna,bsseq,,YUMARS_15-3443_R1.fastq.gz,YUMARS_15-3443_R2.fastq.gz,f874122b3d9b35b789686ee5681dd94e,0cce250f4bfc19a83315052372d94d1d,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,11,44.28,0.2214,,
+Melanoma_YUVIRTUE_20-4029,plasma,cfdna,bsseq,,YUVIRTUE_20-4029_R1.fastq.gz,YUVIRTUE_20-4029_R2.fastq.gz,822a8ee9e3b1b6972b31aaeb18a1de12,34c611826fee61e0fe0d4e88f2dedc77,Active/work/plumbing/three_batches/totprefix/instrument_data/portal.us.medgenome.com/P2001083_04072020/FASTQ,medgenome,30x,11,34.87176,0.1743588,,
+Melanoma_YUEVRY_19-3935,plasma,cfdna,bsseq,,YUEVRY_19_3935_R1.fastq.gz,YUEVRY_19_3935_R2.fastq.gz,8c5ce107e3c77246d5af9867f3dc88c7,ba37f0fec60800ab4c2d86f4c8768266,Active/work/plumbing/three_batches/yprefix/instrument_data/portal.us.medgenome.com/P2001088_04102020/FASTQ,medgenome,30x,9,63,0.315,,
+Melanoma_YUPARK_18-3856,plasma,cfdna,bsseq,,YUPARK_18_3856_R1.fastq.gz,YUPARK_18_3856_R2.fastq.gz,2bde88b6aa81c0b965d30280efa0ed33,7f174ac7d5dc0b9b7452137b933b1bba,Active/work/plumbing/three_batches/yprefix/instrument_data/portal.us.medgenome.com/P2001088_04102020/FASTQ,medgenome,30x,9,37.5,0.1875,,
+Melanoma_YUPARK_18-3832,plasma,cfdna,bsseq,,YUPARK_18_3832_R1.fastq.gz,YUPARK_18_3832_R2.fastq.gz,82c99ea2fa44071a747a2c9e4c88e83e,fc3b04e0ed826a5df19b7f6c758eae78,Active/work/plumbing/three_batches/yprefix/instrument_data/portal.us.medgenome.com/P2001088_04102020/FASTQ,medgenome,30x,9,96.3,0.4815,,
+Melanoma_YUMORF_17-3654,plasma,cfdna,bsseq,,YUMORF_17_3654_R1.fastq.gz,YUMORF_17_3654_R2.fastq.gz,5a4219aa57d559144552e17296d38759,d65094ca08c7145b9d403c1b43304cf9,Active/work/plumbing/three_batches/yprefix/instrument_data/portal.us.medgenome.com/P2001088_04102020/FASTQ,medgenome,30x,12,214.9,1.0745,,
+Melanoma_1254-T_CD45pos,tumor,CD45-,bsseq,,1254-T_CD45Neg_R1.fastq.gz,1254-T_CD45Neg_R2.fastq.gz,0d5e46b1c8c1f524f95af76721ed9352,b89ef76bb6c2aff2adf7d58ba25d3803,Active/work/plumbing/mel_tumor_spike/instrumentData/portal.us.medgenome.com/P2001152_05272020/FASTQ,medgenome,30x,7,100,0.5,784167,980
+Melanoma_1457-T_CD45neg,tumor,CD45-,bsseq,,1457-T_CD45Neg_R1.fastq.gz,1457-T_CD45Neg_R2.fastq.gz,16dcb1b86226763a98493ae575a7a9d6,a6618e48b29b85f76f126c68f368661b,Active/work/plumbing/mel_tumor_spike/instrumentData/portal.us.medgenome.com/P2001152_05272020/FASTQ,medgenome,30x,7,100,0.5,284587,648
+Melanoma_1254_CD45pos,tumor,CD45+,bsseq,,1254-T-CD45-Positive_R1.fastq.gz,1254-T-CD45-Positive_R2.fastq.gz,3bde001134bf294c1044fe8849b4a134,27ad639110e31248ad395c4530c32b3c,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,381398,996
+Melanoma_1254_CD45neg,tumor,CD45-,bsseq,,1254-T-CD45-Negative_R1.fastq.gz,1254-T-CD45-Negative_R2.fastq.gz,973ab99adb52cba1eed786271c8793f2,b04fca43dc0156246021e092c47ac5f1,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,632000,837.3333333
+Melanoma_1254_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,1254-T-CD4_R1.fastq.gz,1254-T-CD4_R2.fastq.gz,e82eff964ee9221c59d50cecd27d61f4,e8cf7f4bb47d8a18c3ae4d44fc155251,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,67.8,0.339,17460,67.8
+Melanoma_1254_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,1254-T-CD8_R1.fastq.gz,1254-T-CD8_R2.fastq.gz,b1b0850f1ec03d3de93404e4a7e9e609,ccb983ce8eb1e12ec0217ed9aee78769,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,50037,176.6
+Melanoma_1254_CD14,tumor,CD14,bsseq,,1254-T-CD14_R1.fastq.gz,1254-T-CD14_R2.fastq.gz,be11ca46e99af3cef38bf7b527a7de93,2eb8cd50e79fc42fba31b0244a254e63,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,81,0.405,15733,81
+Melanoma_1457_CD45pos,tumor,CD45+,bsseq,,1457-T-CD45-Positive_R1.fastq.gz,1457-T-CD45-Positive_R2.fastq.gz,96c4068c1b8abb2eabee172b3ddf7219,5521edcf8c4dc43ff1b07fa8d1fa58a9,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,489611,1484
+Melanoma_1457_CD45neg,tumor,CD45-,bsseq,,1457-T-CD45-Negative_R1.fastq.gz,1457-T-CD45-Negative_R2.fastq.gz,ea96469079dd0f7097f4f5d40d102e85,d71f558d7b9aafb188e2b5460e7b1dbb,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,65518,157.6
+Melanoma_1457_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,1457-T-CD4_R1.fastq.gz,1457-T-CD4_R2.fastq.gz,85cf31b33dcedf4b94fc31a08ba8b162,63983dc4c0a4cff5dba81b9ab158881e,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,101.4,0.507,39415,101.4
+Melanoma_1457_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,1457-T-CD8_R1.fastq.gz,1457-T-CD8_R2.fastq.gz,f5c111b187431e0424cf19280d3138e4,8487d9455ac05c7398447a8c8c19db34,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,80210,187.8
+Melanoma_1457_CD14,tumor,CD14,bsseq,,1457-T-CD14_R1.fastq.gz,1457-T-CD14_R2.fastq.gz,4c723883e112942efd54925457258cee,9d6d6dafd9c19576ee49d0ef4a5b017f,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,38.8,0.194,6629,38.8
+Melanoma_1340_CD45pos,tumor,CD45+,bsseq,,1340-T-CD45-Positive_R1.fastq.gz,1340-T-CD45-Positive_R2.fastq.gz,7b7f8e0aa2c2754f0b1d41099ace4844,951818f9afad7ec374f76abd3b3d628d,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,25.5,0.1275,34561,25.5
+Melanoma_1340_CD45neg,tumor,CD45-,bsseq,,1340-T-CD45-Negative_R1.fastq.gz,1340-T-CD45-Negative_R2.fastq.gz,8a938e3883c3d66ba1aace441bfdd0fc,1f439fa4e07658105a929b4f20480daa,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,8,33.2,0.166,42760,33.2
+Melanoma_960_CD4,tumor,CD4 (TIGIT+LAG3+),bsseq,,960-T-CD4_R1.fastq.gz,960-T-CD4_R2.fastq.gz,5a4363a7d4583ba0904f2c5efda40188,0b5e759a82fceb3ad20fd7e0995994bc,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,60.31666667,0.301583333,14439,60.31666667
+Melanoma_960_CD8,tumor,CD8 (TIGIT+LAG3+),bsseq,,960-T-CD8_R1.fastq.gz,960-T-CD8_R2.fastq.gz,03648035d868dbe626d0f7d41ea7268e,98c8da068630d53041c7cb2e5273ccee,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,52.73333333,0.263666667,12769,52.73333333
+Melanoma_960_CD14,tumor,CD14,bsseq,,960-T-CD14_R1.fastq.gz,960-T-CD14_R2.fastq.gz,41e4ec48f8f72c9d116a72395d9229a5,b25dc6f53d78ce1244f846ec88613d9e,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,9,10.85,0.05425,2256,10.85
+Melanoma_139_CD4,pbmc,CD4,bsseq,,139-P-CD4_R1.fastq.gz,139-P-CD4_R2.fastq.gz,4ab36f956514fa0adb7b392a39b98023,3c5910203e6c2961b53bcbffdeb1410b,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,257009,640
+Melanoma_139_CD8,pbmc,CD8,bsseq,,139-P-CD8_R1.fastq.gz,139-P-CD8_R2.fastq.gz,03da981e2d118697345d55c61e79fbf5,9abc47b2f6325f83bc99769032ab46cf,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,369536,720
+Melanoma_139_CD14,pbmc,CD14,bsseq,,139-P-CD14_R1.fastq.gz,139-P-CD14_R2.fastq.gz,b36cfb6c76cadcaa59f685860a89a272,a107b7dc4c0734a26205146375435cc9,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,276329,623.3333333
+Melanoma_167_CD4,pbmc,CD4,bsseq,,167-P-CD4_R1.fastq.gz,167-P-CD4_R2.fastq.gz,aab57cefee3331e1b65e0cf05bd43424,30129f305fce01248c94ec67cfd1b480,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,125566,334.1666667
+Melanoma_167_CD8,pbmc,CD8,bsseq,,167-P-CD8_R1.fastq.gz,167-P-CD8_R2.fastq.gz,4a936752fe49bfc6ea0c994cedd05ac3,5f5fde3b2ec43ccbcfde9154d660585c,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,94134,270
+Melanoma_167_CD14,pbmc,CD14,bsseq,,167-P-CD14_R1.fastq.gz,167-P-CD14_R2.fastq.gz,0545ab43b0d43a79cc75deb35e53f146,d4228a2eb647ae9c85021b28aa730126,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,146204,383.3333333
+Melanoma_123,pbmc,bulk,bsseq,,123-P-Bulk_R1.fastq.gz,123-P-Bulk_R2.fastq.gz,680d0cde49c8b0b293a041b0fdfcbabb,1a50dce24326f9867bf69222d935fa12,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,,7634
+Melanoma_159,pbmc,bulk,bsseq,,159-P-bulk_R1.fastq.gz,159-P-bulk_R2.fastq.gz,0219256e8fab10cc072c1400eabe5a5b,ebe274f959d4ed0e212162b23b78f8da,Active/abul/wgbs/melanoma_novaseq_data_101320/portal-us.medgenome.com/P2001516_09282020/FASTQ,medgenome,30x,7,100,0.5,,6688
 Melanoma_YUMEDIC-14-3303,plasma,cfdna,emseq,,,,,,,medgenome,30x,8,10,0.05,,
 Melanoma_YURAISE-13-2954,plasma,cfdna,emseq,,,,,,,medgenome,30x,8,10,0.05,,
 Melanoma_YUARGE-14-3173,plasma,cfdna,emseq,,,,,,,medgenome,30x,8,10,0.05,,

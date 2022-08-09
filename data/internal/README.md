@@ -11,3 +11,8 @@ These are parsed by snakemake and the preprocessing/analytical pipelines.
 | healthy_pbmc | PBMCs from healthy donors, sequenced with EM-seq and BS-seq. |
 | melanoma | Melanoma patient samples as part of a collaboration with Yale, including patients undergoing immunotherapy. Sequence with EM-seq and BS-seq. |
 | crc | Colorectal tumor samples, including tumor, cfDNA, and sorted populations. |
+
+
+## WashU / Chaudhuri Lab Users:
+
+The raw data backing these files are stored in RIS in Active/lca_data (e.g. `/storage1/fs1/aadel/Active/lca_data`), which is periodically mirrored to our local compute infrastructure (currently on aclm350 in `/logo2/lca_data`).
