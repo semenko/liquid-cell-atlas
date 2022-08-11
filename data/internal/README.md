@@ -13,6 +13,10 @@ These are parsed by snakemake and the preprocessing/analytical pipelines.
 | crc | Colorectal tumor samples, including tumor, cfDNA, and sorted populations. |
 
 
-## WashU / Chaudhuri Lab Users:
+## WashU / Chaudhuri Lab Users
 
 The raw data backing these files are stored in RIS in Active/lca_data (e.g. `/storage1/fs1/aadel/Active/lca_data`), which is periodically mirrored to our local compute infrastructure (currently on aclm350 in `/logo2/lca_data`).
+
+## Notes
+
+Within the melanoma data, a few of the original .fastq files from the first batch (batch B00) were misplaced. The raw reads were recovered from .bam files as interleaved fastq files (to preserve all flagged reads & orphans) using `samtools fastq <BAM> | gzip --fast > <OUT>.fastq.gz`
