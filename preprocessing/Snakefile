@@ -39,6 +39,62 @@ rule all:
     input:
         expand("/logo2/lca_output/{sample}.txt", sample=SAMPLES)
 
+###############
+### Download & Build References
+# These only run once.
+###############
+
+### Build GRCh38 reference
+# Download our standard reference genome
+# NOTE: This does not include patches (e.g. p14), even though the URL suggests otherwise.
+# This is: GRCh38, with decoys and hs38d1, but no ALT and no patch. For a better understanding, read:
+# https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/README_analysis_sets.txt
+
+HTTPS = HTTPRemoteProvider()
+rule get_reference_genome:
+    input:
+        # Not really ftp -- it's HTTPS/TLS
+        reference_genome = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz", keep_local=True)
+    output:
+        reference_genome = "{DATA_PATH}/reference/GRCh38.fna"
+    run:
+        shell("gunzip -c {input.reference_genome} > {output.reference_genome}")
+
+# Apply both the NCBI U2AF1 fix and the Encode DAC Exclusion List
+# U2AF1 masking file details: https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html
+# Encode DAC Exclusion List details: And also mask the DAC Exclusion List Regions
+rule mask_reference_fasta:
+    input:
+        u1af1_exclusion = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True),
+        dac_exclusion = HTTPS.remote("www.encodeproject.org/files/ENCFF356LFX/@@download/ENCFF356LFX.bed.gz", keep_local=True),
+        reference_genome = "{DATA_PATH}/reference/GRCh38.fna"  # Or: rules.get_reference_genome.output
+    output:
+        masked_reference_genome = "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna"
+    run:
+        shell("gunzip -c {input.dac_exclusion} > {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed")
+        shell("cp {input.u1af1_exclusion} {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed")
+        # maskfasta doesn't work on stdin/stdout, or with gzipped files :/
+        # Mask for DAC
+        shell("bedtools maskfasta -fi {input.reference_genome} -fo {DATA_PATH}/reference/GRCh38-DAC.fna -bed {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed")
+        # Mask for U2AF1
+        shell("bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed")
+
+### bwa meth indices
+# This should run once to generate indices for bwa mem (through bwa-meth)
+rule bwa_meth_indices:
+    input:
+        masked_reference_genome = rules.mask_reference_fasta.output
+    output:
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.amb",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.ann",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.bwt",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.pac",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.sa",
+    run:
+        shell("bwameth.py index {input.masked_reference_genome}")
+
+###############
 
 ### fastp
 # Here we do trimming, but almost no quality filtering (leaving that for downstream)
@@ -47,10 +103,10 @@ rule fastp:
     input:
         sample=["reads/pe/{sample}.1.fastq", "reads/pe/{sample}.2.fastq"]
     output:
-        pipe()
+        pipe("lolcat"),
         trimmed=["trimmed/pe/{sample}.1.fastq", "trimmed/pe/{sample}.2.fastq"],
-        discarded = ""  # Length < 10
-        fastp_json = "report/pe/{sample}.json"
+        discarded = "",  # Length < 10
+        fastp_json = "report/pe/{sample}.json",
         fastp_html = "report/pe/{sample}.html"
     log:
         "logs/fastp/pe/{sample}.log"
@@ -63,15 +119,15 @@ rule fastp:
         #    fastq_barcode=$(zcat -f '!{fq_set.insert_read1}' | head -n 1 | sed -r 's/.*://')
         #    if [[ "${inst_name:0:2}" == 'A0' ]] || [[ "${inst_name:0:2}" == 'NS' ]] || \
         #       [[ "${inst_name:0:2}" == 'NB' ]] || [[ "${inst_name:0:2}" == 'VH' ]] ; then
-        trim_poly_g_flag = "--trim_poly_g"
+        trim_poly_g_flag = "--trim_poly_g",
 
         # Trim specific to BS vs EM-seq input type
-        trim_5prime = "10"
-        trim_3prime = "10"
+        trim_5prime = "10",
+        trim_3prime = "10",
 
         # TruSeq adapters (we could autodetect, but not needed currently).
-        adapter_r1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
-        adapter_r2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
+        adapter_r1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
+        adapter_r2 = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT",
     shell:
         """
         fastp --in1 {input.sample_pe1} --in2 {input.sample_pe2} \
@@ -83,46 +139,7 @@ rule fastp:
         --json "{output.fastp_json}" --html "{output.fastp_html}" \
         --thread {snakemake.threads} \
         2> fastp.stderr
-        """"
-
-
-### Build GRCh38 reference
-# This should run once to generate a standard reference genome, plus a contamination/repair bed for the U2AF1 issue:
-# https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html
-# NOTE: This does not include patches (e.g. p14), even though the URL suggests otherwise.
-# This is: GRCh38, with decoys and hs38d1, but no ALT and no patch. For a better understanding, read:
-# https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/README_analysis_sets.txt
-# This is similar to the Verily standard (GRCh38_Verily_v1)
-HTTP = HTTPRemoteProvider()
-
-rule build_reference_genome:
-    input:
-        # Not really ftp -- it's HTTPS/TLS
-        HTTP.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz", keep_local=True)
-    output:
-        "{DATA_PATH}/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz"
-    shell:
-
-    run:
-        outputName = os.path.basename(input[0])
-        shell("mv {input} {outputName}")
-
-
-
-
-### bwa_meth indices
-# This should run once to generate bwa-meth indices for bwa mem
-rule bwa_meth_indices:
-    input:
-    output:
-        "ref.fa.bwameth.c2t"
-        "ref.fa.bwameth.c2t.amb"
-        "ref.fa.bwameth.c2t.ann"
-        "ref.fa.bwameth.c2t.bwt"
-        "ref.fa.bwameth.c2t.pac"
-        "ref.fa.bwameth.c2t.sa"
-    shell:
-        "bwameth.py index {REFERENCE}"
+        """
 
 ### bwa_meth
 rule bwa_meth:
@@ -131,8 +148,7 @@ rule bwa_meth:
     output:
         pipe(".bwameth.sam")
     shell:
-        "bwameth.py -p -t !{task.cpus} --read-group "@RG\\tID:${fastq_barcode}\\tSM:!{fq_set.library}" --reference !{genome} /dev/stdin \
-                 2>  "!{fq_set.library}_${fastq_barcode}!{fq_set.flowcell}_!{fq_set.lane}_!{fq_set.tile}.log.bwamem" "
+        "bwameth.py -p -t !{task.cpus} --read-group @RG\\tID:${fastq_barcode}\\tSM:!{fq_set.library} --reference !{genome} /dev/stdin 2>something"
 
 
 ### mark nonconverted reads
@@ -146,7 +162,7 @@ rule mark_nonconverted:
     output:
         pipe(".bwameth.nonconv.sam")
     shell:
-        "mark-nonconverted-reads.py 2> "!{fq_set.library}_${fastq_barcode}_!{fq_set.flowcell}_!{fq_set.lane}_!{fq_set.tile}.nonconverted.tsv" \""
+        "mark-nonconverted-reads.py"
 
 ### sort
 # Coordinate sort our input sam, and stream as a sam (no bam yet)
@@ -200,6 +216,7 @@ rule methyldackel_mbias_plots:
     input:
     output:
     shell:
+        "methyldackel mbias"
 
 ### DeepTools bias plots:
 # ? Are these useful
@@ -207,6 +224,7 @@ rule deeptools_bias_plots:
     input:
     output:
     shell:
+        "computeGCBias"
 
 ### wgbs_tools
 # Generate pat/beta file formats
@@ -214,6 +232,7 @@ rule wgbs_tools_prep:
     input:
     output:
     shell:
+        "wgbs_tools"
 
 ### multiqc
 # Aggregate all our pretty data
@@ -221,6 +240,7 @@ rule multiqc:
     input:
     output:
     shell:
+        "multiqc"
 
 
 # Get the file sizes and add to a file
