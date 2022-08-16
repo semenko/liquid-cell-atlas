@@ -5,39 +5,53 @@
 #
 # Note: There are modular ways to approach things with snakefiles — here, I explicitly prioritized
 # simplicity and having one large file that runs the same analyses on all inputs. For example, there's
-# no modular .yaml config -- we just queue this up as a cron job.
+# no modular .yaml config.
 #
 # If you're looking for different approaches, you can explore:
 # Snakepipes WGBS pipeline: https://snakepipes.readthedocs.io/en/latest/content/workflows/WGBS.html
 # Snakemake Wrappers: https://github.com/snakemake/snakemake-wrappers/
 
+import pathlib
 import glob
 import re
 
 import pandas as pd
 from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 
+# TODO: Unify these / symlink from the data path?
 CONFIG_FILE_PATH = "/home/nsemenkovich/liquid-cell-atlas/data/internal"
 DATA_PATH = "/logo2/lca_data"
 
-# For .fa files and indexes (.c2t from bwa index)
-REFERENCE_PATH = "/logo2/reference_data"
+# Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
+data_config_files = glob.glob(f"{CONFIG_FILE_PATH}/melanoma.csv")
 
-data_config_files = glob.glob(f"{CONFIG_FILE_PATH}/*.csv")
+# This is a list of dicts, where each entry is a single sample like:
+# {'experiment': 'melanoma', 'sample_id': 'Melanoma_B08_YURILES-14-3250',
+#   'path_R1': 'YURILES-14-3250_R1.fastq.gz', 'path_R2': 'YURILES-14-3250_R2.fastq.gz',
+#   'method': 'emseq', 'md5sum_R1': '4be250532…', 'md5sum_R2': '783e91bd2…'}
+ALL_SAMPLES_LIST = []
 
-# for file in data_config_files:
-SAMPLE_DF = pd.read_table(f"{CONFIG_FILE_PATH}/melanoma.csv", delimiter=",").set_index("path_R1", drop=False)
-SAMPLES = SAMPLE_DF['path_R1'].tolist()
-SAMPLES = ['YUVASI-09-1042_R1.fastq.gz', 'YUZAT-16-3532_R1.fastq.gz', 'YURADIO-14-3253_R1.fastq.gz', 'YUBAIX-15-3422_R1.fastq.gz']
+for filename in data_config_files:
+    experiment = pathlib.Path(filename).stem
+    print(experiment)
+    # Load the .csv of our sample data
+    sample_df = pd.read_table(filename, delimiter=",").set_index("sample_id", drop=False)
 
-#samplesData = pandas.read_csv(input_table, header=None).loc[:, 0].tolist()
-#samples = [re.findall("[^/]+\.", sample)[0][:-1] for sample in samplesData]  # overly complicated regex
+    # Shove in the "experiment" as a column
+    sample_df['experiment'] = experiment
+
+    # Select just the columns we want.
+    # orient=records returns a list of dicts
+    sample_data = sample_df[['experiment', 'sample_id', 'path_R1', 'path_R2', 'method', 'md5sum_R1', 'md5sum_R2']].to_dict(orient="records")
+
+    ALL_SAMPLES_LIST.extend(sample_data)
 
 # Snakemake is a little funny.
-# The first function here just defines what *output* we'll see when the whole pipeline is done.
+# The first function here just defines what *output* we want when the whole pipeline is done.
 rule all:
     input:
-        expand("/logo2/lca_output/{sample}.txt", sample=SAMPLES)
+        # For now, flagstat is our last step
+        expand("{data_path}/{sample.experiment}/{sample.sample_id}/samtools/flagstat.tsv", sample=ALL_SAMPLES_LIST, data_path=DATA_PATH)
 
 ###############
 ### Download & Build References
@@ -79,9 +93,9 @@ rule mask_reference_fasta:
         # Mask for U2AF1
         shell("bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed")
 
-### bwa meth indices
+### bwa meth index
 # This should run once to generate indices for bwa mem (through bwa-meth)
-rule bwa_meth_indices:
+rule bwa_meth_index:
     input:
         masked_reference_genome = rules.mask_reference_fasta.output
     output:
@@ -96,20 +110,40 @@ rule bwa_meth_indices:
 
 ###############
 
+
+###############
+### Core Pipeline Steps
+###############
+
+### md5
+# Validate checksums
+rule md5sum:
+    input:
+        r1_file = "",
+        r2_file = "",
+        r1_checksum = "",
+        r2_checksum = "",
+    output:
+        "validated.md5"
+    run:
+        shell("checksums.md5")
+        shell("md5sum --check > {output}")
+
+
 ### fastp
-# Here we do trimming, but almost no quality filtering (leaving that for downstream)
-# We adapter trim and do poly-g filtering, but leave quality filtering / polyN filtering for later.
+# We adapter trimming and poly-g filtering, but leave quality filtering / polyN filtering for later.
+# NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
 rule fastp:
     input:
-        sample=["reads/pe/{sample}.1.fastq", "reads/pe/{sample}.2.fastq"]
+        sample_pe1 = "reads/pe/{sample}.1.fastq",
+        sample_pe2 = "reads/pe/{sample}.2.fastq"
     output:
-        pipe("lolcat"),
-        trimmed=["trimmed/pe/{sample}.1.fastq", "trimmed/pe/{sample}.2.fastq"],
-        discarded = "",  # Length < 10
+        fastp_pipe_output = pipe("{sample}.fastp.interleaved"),
+        fastp_failed = "report/pe/{sample}.failed.fa",  # Length < 10
         fastp_json = "report/pe/{sample}.json",
         fastp_html = "report/pe/{sample}.html"
     log:
-        "logs/fastp/pe/{sample}.log"
+        fastp_err = "logs/fastp/pe/{sample}.log"
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
         # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
@@ -122,8 +156,12 @@ rule fastp:
         trim_poly_g_flag = "--trim_poly_g",
 
         # Trim specific to BS vs EM-seq input type
-        trim_5prime = "10",
-        trim_3prime = "10",
+        trim_r1_5prime = "10",
+        trim_r1_3prime = "10",
+        trim_r2_5prime = "10",
+        trim_r2_3prime = "10",
+
+        minimum_length = 10,
 
         # TruSeq adapters (we could autodetect, but not needed currently).
         adapter_r1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
@@ -131,20 +169,26 @@ rule fastp:
     shell:
         """
         fastp --in1 {input.sample_pe1} --in2 {input.sample_pe2} \
-        --trim_front1 {params.trim_length} --trim_tail1 {params.trim_length} \
-        --trim_front2 {params.trim_length} --trim_tail2 {params.trim_length} \
+        --trim_front1 {params.trim_r1_5prime} --trim_tail1 {params.trim_r1_3prime} \
+        --trim_front2 {params.trim_r2_5prime} --trim_tail2 {params.trim_r2_3prime} \
         --adapter_sequence {params.adapter_r1} --adapter_sequence_r2 {params.adapter_r2} \
-        --length_required 10 --disable_quality_filtering --overrepresentation_analysis \
+        --length_required {params.minimum_length} --disable_quality_filtering --overrepresentation_analysis \
         {trim_polyg} \
         --json "{output.fastp_json}" --html "{output.fastp_html}" \
         --thread {snakemake.threads} \
-        2> fastp.stderr
+        --stdout --failed_out {output.fastp_failed} \
+        2> {log.fastp_err} > {output.fastp_pipe_output}
         """
 
 ### bwa_meth
+# This uses bwa mem, instead of bwa-mem2
+# NOTE: You could also run bwa mem2. I don't here because of a compile-time bug:
+# see https://github.com/bwa-mem2/bwa-mem2/issues/207
 rule bwa_meth:
     input:
-        pipe(".fastp.fastq")
+        ".fastp.fastq",
+        # Not really an input, but forces the index to build.
+        bwa_meth_indices = rules.bwa_meth_index.output
     output:
         pipe(".bwameth.sam")
     shell:
@@ -158,7 +202,7 @@ rule bwa_meth:
 # Note that  MethylDackel can independently identify poor conversion (set minConversionEfficiency).
 rule mark_nonconverted:
     input:
-        pipe(".bwameth.sam")
+        ".bwameth.sam"
     output:
         pipe(".bwameth.nonconv.sam")
     shell:
@@ -168,17 +212,18 @@ rule mark_nonconverted:
 # Coordinate sort our input sam, and stream as a sam (no bam yet)
 rule samtools_sort:
     input:
-        pipe(".bwameth.nonconv.sam")
+        ".bwameth.nonconv.sam"
     output:
         pipe(".sorted.sam")
     shell:
         "samtools sort --output-fmt SAM --threads {snakemake.threads} {input} {output}"
 
+
 ### fixmate
 # We need to ad ms and MC tags for markdup to run next
 rule samtools_fixmate:
     input:
-        pipe(".sorted.sam")
+        ".sorted.sam"
     output:
         pipe(".fixmate.bam")
     shell:
@@ -186,29 +231,38 @@ rule samtools_fixmate:
         # -m add mate score tag
         "samtools fixmate -u -m --output-fmt SAM --threads {snakemake.threads} {input} {output}"
 
+
 ### markdup
 # Mark duplicates from a .bam file
 rule samtools_markdup:
     input:
-        pipe(".fixmate.sam")
+        ".fixmate.sam"
     output:
-        "{sample}.bam"
-    shell:
+        bam = "{sample}.bam",
+        stats_file = "{sample}.txt",
+    run:
         # TODO: Set mark supplementary alignments of duplicates as duplicates? (-S)
         # -f: Write stats to file
         # 
         # Output with compress level 1 (lowest)
-        # ? Write index here
         # "-##idx##indexname" 
-        "samtools markdup  -f {stats.file} --output-fmt BAM --output-fmt-option level=1 --threads {snakemake.threads} {input} {output} "
+        shell("samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {snakemake.threads} {input} {output.bam}")
 
+### flagstat
+# Generate run statistics
 rule samtools_flagstat:
     input:
         "{sample}.bam"
     output:
         "{sample}.txt"
-    shell:
-        "samtools flagstat"
+    run:
+        shell("samtools flagstat {input} > {output}")
+
+
+
+
+
+###### NOT YET IMPLEMENTED BELOW ########
 
 ### MethylDackel mbias
 # Make per-sample mbias plots
