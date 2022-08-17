@@ -56,6 +56,11 @@ all_experiments_data = all_experiments_df[['experiment', 'sample_id', 'path_R1',
 ALL_SAMPLES_LIST.extend(all_experiments_data)
 
 
+##### FOR DEVELOPMENT
+# Only one:
+ALL_SAMPLES_LIST = [ALL_SAMPLES_LIST[0]]
+print(ALL_SAMPLES_LIST)
+
 ###############
 # Snakemake is a little funny.
 # The first function here just defines what *output* we want when the whole pipeline is done.
@@ -90,6 +95,7 @@ rule get_reference_genome:
 # U2AF1 masking file details: https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html
 # Encode DAC Exclusion List details: https://www.encodeproject.org/annotations/ENCSR636HFF/
 rule mask_reference_fasta:
+    conda: "env.yaml"
     input:
         u1af1_exclusion = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True),
         dac_exclusion = HTTPS.remote("encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz", keep_local=True),
@@ -98,18 +104,21 @@ rule mask_reference_fasta:
         masked_reference_genome = "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna"
     log:
         maskfasta = "{DATA_PATH}/reference/maskfasta.log.txt"
-    run:
-        shell("gunzip -c {input.dac_exclusion} > {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed")
-        shell("cp {input.u1af1_exclusion} {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed")
+    shell:
+        """
+        gunzip -c {input.dac_exclusion} > {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed
+        cp {input.u1af1_exclusion} {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed
         # maskfasta doesn't work on stdin/stdout, or with gzipped files :/
         # Mask for DAC
-        shell("bedtools maskfasta -fi {input.reference_genome} -fo {DATA_PATH}/reference/GRCh38-DAC.fna -bed {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed >>{log.maskfasta} 2>&1")
+        bedtools maskfasta -fi {input.reference_genome} -fo {DATA_PATH}/reference/GRCh38-DAC.fna -bed {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed >>{log.maskfasta} 2>&1
         # Mask for U2AF1
-        shell("bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed >>{log.maskfasta} 2>&1")
+        bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed >>{log.maskfasta} 2>&1
+        """
 
 ### bwa meth index
 # This should run once to generate indices for bwa mem (through bwa-meth)
 rule bwa_meth_index:
+    conda: "env.yaml"
     input:
         masked_reference_genome = rules.mask_reference_fasta.output
     output:
@@ -121,8 +130,8 @@ rule bwa_meth_index:
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.sa",
     log:
         index = "{DATA_PATH}/reference/bwameth_index.log.txt"
-    run:
-        shell("bwameth.py index {input.masked_reference_genome} >{log.index} 2>&1")
+    shell:
+        "bwameth.py index {input.masked_reference_genome} >{log.index} 2>&1"
 
 ###############
 
@@ -151,6 +160,7 @@ rule md5sum:
 # We adapter trimming and poly-g filtering, but leave quality filtering / polyN filtering for later.
 # NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
 rule fastp:
+    conda: "env.yaml"
     input:
         r1_file = rules.md5sum.input.r1_file,
         r2_file = rules.md5sum.input.r2_file,
@@ -161,6 +171,7 @@ rule fastp:
         fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/report.html"
     log:
         fastp_err = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.log.txt"
+    threads: 4
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
         # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
@@ -192,7 +203,7 @@ rule fastp:
         --length_required {params.minimum_length} --disable_quality_filtering --overrepresentation_analysis \
         {params.trim_poly_g_flag} \
         --json "{output.fastp_json}" --html "{output.fastp_html}" \
-        --thread {workflow.cores} \
+        --thread {threads} \
         --stdout --failed_out {output.fastp_failed} \
         2> {log.fastp_err} > {output.fastp_pipe_output}
         """
@@ -202,6 +213,7 @@ rule fastp:
 # NOTE: You could also run bwa mem2. I don't here because of a compile-time bug:
 # see https://github.com/bwa-mem2/bwa-mem2/issues/207
 rule bwa_meth:
+    conda: "env.yaml"
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
@@ -210,10 +222,11 @@ rule bwa_meth:
         pipe("{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam")
     log:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/bwameth/log.txt"
+    threads: 4
     shell:
         # TODO: FIX
         # include --read-group @RG\\tID:${fastq_barcode}\\tSM:!{fq_set.library} 
-        "bwameth.py -p -t {workflow.cores} --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err}"
+        "bwameth.py -p -t {threads} --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err}"
 
 
 ### mark nonconverted reads
@@ -222,6 +235,7 @@ rule bwa_meth:
 # This sets XX:Z:UC (the X? Y? and Z? fields of SAM/BAM are user-reserved). We do *not* set the Vendor Failed bit.
 # Note that  MethylDackel can independently identify poor conversion (set minConversionEfficiency).
 rule mark_nonconverted:
+    conda: "env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam"
     output:
@@ -229,11 +243,13 @@ rule mark_nonconverted:
     log:
         nonconverted = "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconverted.log.txt"
     shell:
-        "mark-nonconverted-reads.py 2>{log.nonconverted}"
+        # TODO: Fix this path
+        "/home/nsemenkovich/sandbox/mark-nonconverted-reads/mark-nonconverted-reads.py 2>{log.nonconverted}"
 
 ### sort
 # Coordinate sort our input sam, and stream as a sam (no bam yet)
 rule samtools_sort:
+    conda: "env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"
     output:
@@ -241,12 +257,13 @@ rule samtools_sort:
     log:
         sort = "{DATA_PATH}/{experiment}/{sample}/samtools/sort.log.txt"
     shell:
-        "samtools sort --output-fmt SAM --threads {workflow.cores} {input} {output} 2>{log.sort}"
+        "samtools sort --output-fmt SAM --threads {threads} {input} {output} 2>{log.sort}"
 
 
 ### fixmate
 # We need to ad ms and MC tags for markdup to run next
 rule samtools_fixmate:
+    conda: "env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/samtools/sorted.sam"
     output:
@@ -256,12 +273,13 @@ rule samtools_fixmate:
     shell:
         # -u uncompressed output
         # -m add mate score tag
-        "samtools fixmate -u -m --output-fmt SAM --threads {workflow.cores} {input} {output} 2>{log.fixmate}"
+        "samtools fixmate -u -m --output-fmt SAM --threads {threads} {input} {output} 2>{log.fixmate}"
 
 
 ### markdup
 # Mark duplicates from a .bam file
 rule samtools_markdup:
+    conda: "env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"
     output:
@@ -274,11 +292,12 @@ rule samtools_markdup:
         # TODO: Specify index name if requred? "-##idx##indexname"
         # -f: Write stats to file
         # Output with compress level 1 (lowest)
-        "samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {workflow.cores} {input} {output.bam} 2>{log.markdup}"
+        "samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {threads} {input} {output.bam} 2>{log.markdup}"
 
 ### flagstat
 # Generate run statistics
 rule samtools_flagstat:
+    conda: "env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/aligned.bam"
     output:
