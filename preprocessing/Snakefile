@@ -51,7 +51,7 @@ for filename in data_config_files:
 rule all:
     input:
         # For now, flagstat is our last step
-        expand("{data_path}/{sample.experiment}/{sample.sample_id}/samtools/flagstat.tsv", sample=ALL_SAMPLES_LIST, data_path=DATA_PATH)
+        [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/samtools/flagstat.tsv" for sample in ALL_SAMPLES_LIST]
 
 ###############
 ### Download & Build References
@@ -84,14 +84,16 @@ rule mask_reference_fasta:
         reference_genome = "{DATA_PATH}/reference/GRCh38.fna"  # Or: rules.get_reference_genome.output
     output:
         masked_reference_genome = "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna"
+    log:
+        maskfasta = "{DATA_PATH}/reference/maskfasta.log.txt"
     run:
         shell("gunzip -c {input.dac_exclusion} > {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed")
         shell("cp {input.u1af1_exclusion} {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed")
         # maskfasta doesn't work on stdin/stdout, or with gzipped files :/
         # Mask for DAC
-        shell("bedtools maskfasta -fi {input.reference_genome} -fo {DATA_PATH}/reference/GRCh38-DAC.fna -bed {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed")
+        shell("bedtools maskfasta -fi {input.reference_genome} -fo {DATA_PATH}/reference/GRCh38-DAC.fna -bed {DATA_PATH}/reference/DAC-Exclusion-List-ENCFF356LFX.bed >>{log.maskfasta} 2>&1")
         # Mask for U2AF1
-        shell("bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed")
+        shell("bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed >>{log.maskfasta} 2>&1")
 
 ### bwa meth index
 # This should run once to generate indices for bwa mem (through bwa-meth)
@@ -105,8 +107,10 @@ rule bwa_meth_index:
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.bwt",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.pac",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.sa",
+    log:
+        index = "{DATA_PATH}/reference/bwameth_index.log.txt"
     run:
-        shell("bwameth.py index {input.masked_reference_genome}")
+        shell("bwameth.py index {input.masked_reference_genome} >{log.index} 2>&1")
 
 ###############
 
@@ -119,15 +123,17 @@ rule bwa_meth_index:
 # Validate checksums
 rule md5sum:
     input:
-        r1_file = "",
-        r2_file = "",
+        # TODO: Extract these data from the sample DF
+        r1_file = "/{DATA_PATH}/{experiment}/{sample}/raw/{read1}.fastq",
+        r2_file = "/{DATA_PATH}/{experiment}/{sample}/raw/{read2}.fastq",
         r1_checksum = "",
         r2_checksum = "",
     output:
-        "validated.md5"
+        checksums = "/{DATA_PATH}/{experiment}/{sample}/raw/known.md5",
+        validated = "/{DATA_PATH}/{experiment}/{sample}/raw/validated.md5"
     run:
-        shell("checksums.md5")
-        shell("md5sum --check > {output}")
+        shell("echo '{input.r1_checksum}\t{input.r1_file}\n{input.r2_checksum}\t{input.r2_file}\n' > {output.checksums}")
+        shell("md5sum --check {output.checksums} > {output.validated}")
 
 
 ### fastp
@@ -135,15 +141,15 @@ rule md5sum:
 # NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
 rule fastp:
     input:
-        sample_pe1 = "reads/pe/{sample}.1.fastq",
-        sample_pe2 = "reads/pe/{sample}.2.fastq"
+        sample_pe1 = "/{DATA_PATH}/{experiment}/{sample}/raw/{read1}.fastq",
+        sample_pe2 = "/{DATA_PATH}/{experiment}/{sample}/raw/{read2}.fastq"
     output:
-        fastp_pipe_output = pipe("{sample}.fastp.interleaved"),
-        fastp_failed = "report/pe/{sample}.failed.fa",  # Length < 10
-        fastp_json = "report/pe/{sample}.json",
-        fastp_html = "report/pe/{sample}.html"
+        fastp_pipe_output = pipe("/{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa"),
+        fastp_failed = "/{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa",  # Length < 10
+        fastp_json = "/{DATA_PATH}/{experiment}/{sample}/fastp/report.json",
+        fastp_html = "/{DATA_PATH}/{experiment}/{sample}/fastp/report.html"
     log:
-        fastp_err = "logs/fastp/pe/{sample}.log"
+        fastp_err = "/{DATA_PATH}/{experiment}/{sample}/fastp/fastp.log.txt"
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
         # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
@@ -186,13 +192,17 @@ rule fastp:
 # see https://github.com/bwa-mem2/bwa-mem2/issues/207
 rule bwa_meth:
     input:
-        ".fastp.fastq",
+        input_fasta = "/{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
+        reference_genome = "",
         # Not really an input, but forces the index to build.
         bwa_meth_indices = rules.bwa_meth_index.output
     output:
-        pipe(".bwameth.sam")
-    shell:
-        "bwameth.py -p -t !{task.cpus} --read-group @RG\\tID:${fastq_barcode}\\tSM:!{fq_set.library} --reference !{genome} /dev/stdin 2>something"
+        pipe("/{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam")
+    log:
+        bwameth_err = "/{DATA_PATH}/{experiment}/{sample}/bwameth/log.txt"
+    run:
+        # TODO: FIX
+        shell("bwameth.py -p -t {snakemake.threads} --read-group @RG\\tID:${fastq_barcode}\\tSM:!{fq_set.library} --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err}")
 
 
 ### mark nonconverted reads
@@ -202,62 +212,71 @@ rule bwa_meth:
 # Note that  MethylDackel can independently identify poor conversion (set minConversionEfficiency).
 rule mark_nonconverted:
     input:
-        ".bwameth.sam"
+        "/{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam"
     output:
-        pipe(".bwameth.nonconv.sam")
-    shell:
-        "mark-nonconverted-reads.py"
+        pipe("/{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam")
+    log:
+        nonconverted = "/{DATA_PATH}/{experiment}/{sample}/bwameth/nonconverted.log.txt"
+    run:
+        shell("mark-nonconverted-reads.py 2>{log.nonconverted}")
 
 ### sort
 # Coordinate sort our input sam, and stream as a sam (no bam yet)
 rule samtools_sort:
     input:
-        ".bwameth.nonconv.sam"
+        "/{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"
     output:
-        pipe(".sorted.sam")
-    shell:
-        "samtools sort --output-fmt SAM --threads {snakemake.threads} {input} {output}"
+        pipe("/{DATA_PATH}/{experiment}/{sample}/samtools/sorted.sam")
+    log:
+        sort = "/{DATA_PATH}/{experiment}/{sample}/samtools/sort.log.txt"
+    run:
+        shell("samtools sort --output-fmt SAM --threads {snakemake.threads} {input} {output} 2>{log.sort}")
 
 
 ### fixmate
 # We need to ad ms and MC tags for markdup to run next
 rule samtools_fixmate:
     input:
-        ".sorted.sam"
+        "/{DATA_PATH}/{experiment}/{sample}/samtools/sorted.sam"
     output:
-        pipe(".fixmate.bam")
-    shell:
+        pipe("/{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam")
+    log:
+        fixmate = "/{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.log.txt"
+    run:
         # -u uncompressed output
         # -m add mate score tag
-        "samtools fixmate -u -m --output-fmt SAM --threads {snakemake.threads} {input} {output}"
+        shell("samtools fixmate -u -m --output-fmt SAM --threads {snakemake.threads} {input} {output} 2>{log.fixmate}")
 
 
 ### markdup
 # Mark duplicates from a .bam file
 rule samtools_markdup:
     input:
-        ".fixmate.sam"
+        "/{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"
     output:
-        bam = "{sample}.bam",
-        stats_file = "{sample}.txt",
+        bam = "/{DATA_PATH}/{experiment}/{sample}/aligned.bam",
+        stats_file = "/{DATA_PATH}/{experiment}/{sample}/samtools/markdup.txt",
+    log:
+        markdup = "/{DATA_PATH}/{experiment}/{sample}/samtools/markdup.log.txt"
     run:
         # TODO: Set mark supplementary alignments of duplicates as duplicates? (-S)
         # -f: Write stats to file
         # 
         # Output with compress level 1 (lowest)
         # "-##idx##indexname" 
-        shell("samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {snakemake.threads} {input} {output.bam}")
+        shell("samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {snakemake.threads} {input} {output.bam} 2>{log.markdup}")
 
 ### flagstat
 # Generate run statistics
 rule samtools_flagstat:
     input:
-        "{sample}.bam"
+        "/{DATA_PATH}/{experiment}/{sample}/aligned.bam"
     output:
-        "{sample}.txt"
+        "/{DATA_PATH}/{experiment}/{sample}/samtools/flagstat.tsv"
+    log:
+        flagstat = "/{DATA_PATH}/{experiment}/{sample}/samtools/flagstat.log.txt"
     run:
-        shell("samtools flagstat {input} > {output}")
-
+        shell("samtools flagstat {input} 2>{log.flagstat} > {output}")
 
 
 
@@ -295,13 +314,3 @@ rule multiqc:
     output:
     shell:
         "multiqc"
-
-
-# Get the file sizes and add to a file
-rule get_size:
-    input:
-        "/logo2/lca_data/melanoma/{sample}"
-    output:
-        "/logo2/lca_output/{sample}.txt"
-    shell:
-        "ls -lha {input} > {output}"
