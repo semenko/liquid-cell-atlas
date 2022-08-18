@@ -1,43 +1,47 @@
 # Raw Sequencing Preprocessing
 
-A standardized WGBS pre-processing pipeline for our internally generated WGBS bisulfite & EM-seq data. This goes from .fastq to methylation calls via Bismark, using Snakemake.
+A standardized WGBS pre-processing pipeline for our internally generated WGBS bisulfite & EM-seq data. This goes from .fastq to methylation calls (via bwa-meth) and extensive QC and plotting, using a snakemake pipeline.
 
-## Background
+## Pipeline Overview
 
-I strongly suggest reading work from Felix Krueger (author of Bismark) to understand this approach. In particular:
+Here's a high-level overview of the Snakemake pipeline, generated via `snakemake --rulegraph | dot -Tpng > rules.png`
+
+<p align="center">
+<img src="https://user-images.githubusercontent.com/167135/185484931-ccfa0549-6898-44e1-9be2-ee0cf25ee6b2.png" width="500">
+</p>
+
+## Background & Trimming Approach
+
+I strongly suggest reading work from Felix Krueger (author of Bismark) as background. In particular:
 - TrimGalore's [RRBS guide](https://github.com/FelixKrueger/TrimGalore/blob/master/Docs/RRBS_Guide.pdf)
 - The Babraham [WGBS/RRBS tutorials](https://www.bioinformatics.babraham.ac.uk/training.html#bsseq)
+
+For similar pipelines and inspiration, see:
+- NEB's [EM-seq pipeline](https://github.com/nebiolabs/EM-seq/)
 - Felix Krueger's [Nextflow WGBS Pipeline](https://github.com/FelixKrueger/nextflow_pipelines/blob/master/nf_bisulfite_WGBS)
+- The Snakepipes [WGBS pipeline](https://snakepipes.readthedocs.io/en/latest/content/workflows/WGBS.html)
 
-## Processing Steps:
+## Reference Genome
 
-- QC Analysis with FastQC
-- Contamination testing with FastQ Screen
-- Adapter & 3' trimming with TrimGalore
-    - Note: I chose this over fastp & others as it was specifically designed for WGBS/RRBS (and mostly just wraps cutadapt). There is great documentation on its filtering/trimming decisions [in this guide](https://github.com/FelixKrueger/TrimGalore/blob/master/Docs/RRBS_Guide.pdf).
-    - TrimGalore steps:
-        - Trim low quality (Phred <20) basepairs from 3' end
-        - Remove adapters (first 13bp of Illumina standard adapters)
-        - Min read size 20bp (for each entry in a pair)
-- Run Bismark
+I chose GRCh38, with these specifics:
+- No patches
+- Includes the hs38d1 decoy
+- Includes Alt chromosomes
+- Applies the (U2AF1 masking file)[https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html]
+- Applies the (Encode DAC exclusion)[https://www.encodeproject.org/annotations/ENCSR636HFF/]
+
+You can see a good explanation of the rationale for some of these components at (this NCBI explainer)[https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/README_analysis_sets.txt].
 
 
-```
--- [Once] Generate Bismark index for GRCh38/hg38
--- FastQC Analysis
--- Trim Galore (default flags)
-    |
-    -- FastQ Screen (--bisulfite)
-    -- FastQC (again)
-    -- Bismark (default flags)
-        |
-        -- Bismark deduplication (? EmSEQ necessary?)
-            |
-            -- Bismark methylation extraction (--bedGraph --buffer 10G --parallel 4 --ignore_r2 2)       
--- bismark2report
--- bismark2summary
--- MultiQC
-```
+## Trimming Parameters
+
+
+## Requirements
+
+All software requirements are specified in `env.yaml` except for:
+- NEB's (mark-nonconverted-reads.py package)[https://github.com/nebiolabs/mark-nonconverted-reads]
+- (wgbs_tools)[https://github.com/nloyfer/wgbs_tools]
+
 
 ### Random thoughts
 
@@ -55,18 +59,3 @@ For paired-end BS-Seq, it is recommended to remove the first few bp because the 
 
 `--clip_R1 5 --clip_R2 3 --three_prime_clip_R1 1 --three_prime_clip_R2 1`
 --dovetail ?
-
-## Running:
-
-1. Run `download_and_extract_reference.sh`
-    1. This downloads and extracts the Hg38 reference genomes via [Illumina iGenomes](https://support.illumina.com/sequencing/sequencing_software/igenome.html)
-1. Run ``
-    1. This establises a conda environment for snakemake
-    1. For simplicity, we do **not** include module/cluster support
-1. Test your installation by running ``
-1. Run on real data buy running ``
-
-
-
-## License
-MIT - derives some code from https://github.com/lyijin/bismsmark which is MIT licensed.
