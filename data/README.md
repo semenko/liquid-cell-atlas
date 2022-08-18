@@ -1,16 +1,18 @@
-# Raw & Pre-processed Data
+# Internal Experiments
 
-These directories contain code / scripts / pointers for raw data & pre-processing for the LCA pipeline.
+A collection of our internally generated sequencing data. Raw files aren't stored on github (internally, they're symlinked / hardlinked from different volumes).
+  
+These are parsed by snakemake and the preprocessing/analytical pipelines.
 
-## Architecture
+  
+| Folder | Experiment Description |
+| --- | --- |
+| epcam_spike | PBMCs from healthy donors, spiked with varying percentages of HT-29 DNA (an EPCAM+ CRC cell line), sequenced with EM-seq and BS-seq. |
+| healthy_pbmc | PBMCs from healthy donors, sequenced with EM-seq and BS-seq. |
+| melanoma | Melanoma patient samples as part of a collaboration with Yale, including patients undergoing immunotherapy. Sequence with EM-seq and BS-seq. |
+| crc | Colorectal tumor samples, including tumor, cfDNA, and sorted populations. |
 
 
-* external/
-  * encode (**Populated by …**)
-  * blueprint (**Populated by …**)
+## WashU / Chaudhuri Lab Users
 
-## License / Availablity
-
-Third party data (e.g. ENCODE and BLUEPRINT) are covered by their own 3rd party licenses.
-
-Our lab-generated data are available via *** and licensed under ***
+The raw data backing these files are stored in RIS in Active/lca_data (e.g. `/storage1/fs1/aadel/Active/lca_data`), which is periodically mirrored to our local compute infrastructure (currently on aclm350 in `/logo2/lca_data`).
