@@ -68,7 +68,7 @@ print(ALL_SAMPLES_LIST)
 rule all:
     input:
         # For now, flagstat is our last step
-        [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/samtools/stats.txt" for sample in ALL_SAMPLES_LIST]
+        [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST]
 
 ###############
 ### Download & Build References
@@ -95,7 +95,7 @@ rule get_reference_genome:
 # U2AF1 masking file details: https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html
 # Encode DAC Exclusion List details: https://www.encodeproject.org/annotations/ENCSR636HFF/
 rule mask_reference_fasta:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         u1af1_exclusion = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True),
         dac_exclusion = HTTPS.remote("encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz", keep_local=True),
@@ -118,7 +118,7 @@ rule mask_reference_fasta:
 ### bwa meth index
 # This should run once to generate indices for bwa mem (through bwa-meth)
 rule bwa_meth_index:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         masked_reference_genome = rules.mask_reference_fasta.output
     output:
@@ -163,7 +163,7 @@ rule md5sum:
 # We adapter trimming and poly-g filtering, but leave quality filtering / polyN filtering for later.
 # NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
 rule fastp:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         md5_sums = rules.md5sum.output.validated,
         r1_file = rules.md5sum.input.r1_file,
@@ -215,7 +215,7 @@ rule fastp:
 # NOTE: You could also run bwa mem2. I don't here because of a compile-time bug:
 # see https://github.com/bwa-mem2/bwa-mem2/issues/207
 rule bwa_meth:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
@@ -236,7 +236,7 @@ rule bwa_meth:
 # This sets XX:Z:UC (the X? Y? and Z? fields of SAM/BAM are user-reserved). We do *not* set the Vendor Failed bit.
 # Note that  MethylDackel can independently identify poor conversion (set minConversionEfficiency).
 rule mark_nonconverted:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         aligned_sam = "{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome
@@ -253,7 +253,7 @@ rule mark_nonconverted:
 ### sort
 # Coordinate sort our input sam, and stream as a sam (no bam yet)
 rule samtools_sort:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"
     output:
@@ -267,7 +267,7 @@ rule samtools_sort:
 ### fixmate
 # We need to ad ms and MC tags for markdup to run next
 rule samtools_fixmate:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/samtools/sorted.sam"
     output:
@@ -284,7 +284,7 @@ rule samtools_fixmate:
 # Mark duplicates from a .bam file
 # NOTE: This is the final step in the core alignment pipeline: markdup writes a (lightly) compressed .bam file and index.
 rule samtools_markdup:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"
     output:
@@ -293,9 +293,9 @@ rule samtools_markdup:
     log:
         markdup = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.log.txt"
     shell:
-        # TODO: Set mark supplementary alignments of duplicates as duplicates? (-S)
+        # TODO: Mark supplementary reads of duplicates as duplicates? (-S)
         # TODO: Specify index name if requred? "-##idx##indexname"
-        # Output with compress level 1 (lowest)
+        # We output with compress level 1 (lowest)
         "cat {input} | samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {threads} - {output.bam} 2>{log.markdup}"
 
 
@@ -305,7 +305,7 @@ rule samtools_markdup:
 
 ### samtools statistics
 rule samtools_statistics:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         rules.samtools_markdup.output.bam
     output:
@@ -325,7 +325,7 @@ rule samtools_statistics:
 
 ### MethylDackel mbias
 rule methyldackel_mbias_plots:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         bam = rules.samtools_markdup.output.bam,
         reference = rules.mask_reference_fasta.output.masked_reference_genome
@@ -342,7 +342,7 @@ rule methyldackel_mbias_plots:
 
 ### FastQC stats
 rule fastqc_bam:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         rules.samtools_markdup.output.bam
     output:
@@ -359,7 +359,7 @@ rule fastqc_bam:
 
 ### goleft indexcov
 rule goleft_indexcov:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         rules.samtools_markdup.output.bam
     output:
@@ -368,7 +368,6 @@ rule goleft_indexcov:
         "{DATA_PATH}/{experiment}/{sample}/goleft/goleft.log.txt"
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/goleft/"
-    threads: 1
     shell:
         # TODO: Run on all .bam files? Multiple from one project? All from a given sequencing batch?
         "goleft indexcov --directory {params.out_dir} {input} >{log} 2>&1"
@@ -376,8 +375,9 @@ rule goleft_indexcov:
 
 ### DeepTools bias plots
 # For GC bias, see https://deeptools.readthedocs.io/en/develop/content/tools/computeGCBias.html
+# TODO: Implement this
 rule deeptools_bias_plots:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         # rules.samtools_markdup.output.bam
     output:
@@ -389,7 +389,7 @@ rule deeptools_bias_plots:
 ### wgbs_tools
 # Generate index
 rule wgbs_tools_index:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         rules.mask_reference_fasta.output.masked_reference_genome
     output:
@@ -402,13 +402,14 @@ rule wgbs_tools_index:
 
 ### WGBS pat/beta file formats
 rule wgbs_tools_pat_beta:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
-        rules.samtools_markdup.output.bam
+        bam = rules.samtools_markdup.output.bam,
+        index = rules.wgbs_tools_index.output
     output:
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.pat.gz",
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.beta"
-        # TODO: What's the mbias output???
+        # TODO: What's the mbias output?
     log:
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/bam2pat.log.txt"
     params:
@@ -416,18 +417,19 @@ rule wgbs_tools_pat_beta:
     threads: 1
     shell:
         # TODO: Fix this path
-        "wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input} >{log} 2>&1"
+        "wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
 
 ### multiqc
 # Aggregate all our pretty data
 # Note: This pan-dependency ensures all other jobs are run.
 rule multiqc:
-    conda: "env.yaml"
+    conda: "envs/env.yaml"
     input:
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
         rules.methyldackel_mbias_plots.output,
-        rules.wgbs_tools_pat_beta.output,
+        rules.goleft_indexcov.output
+        # rules.wgbs_tools_pat_beta.output,
         # rules.deeptools_bias_plots.output
     output:
         "{DATA_PATH}/{experiment}/{sample}/multiqc/multiqc_report.html"
