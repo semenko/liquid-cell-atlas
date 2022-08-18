@@ -27,26 +27,19 @@ I chose GRCh38, with these specifics:
 - No patches
 - Includes the hs38d1 decoy
 - Includes Alt chromosomes
-- Applies the (U2AF1 masking file)[https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html]
-- Applies the (Encode DAC exclusion)[https://www.encodeproject.org/annotations/ENCSR636HFF/]
+- Applies the [U2AF1 masking file](https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html)
+- Applies the [Encode DAC exclusion](https://www.encodeproject.org/annotations/ENCSR636HFF/)
 
-You can see a good explanation of the rationale for some of these components at (this NCBI explainer)[https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/README_analysis_sets.txt].
-
-
-## Trimming Parameters
-
+You can see a good explanation of the rationale for some of these components at [this NCBI explainer](https://ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/README_analysis_sets.txt).
 
 ## Requirements
 
 All software requirements are specified in `env.yaml` except for:
-- NEB's (mark-nonconverted-reads.py package)[https://github.com/nebiolabs/mark-nonconverted-reads]
-- (wgbs_tools)[https://github.com/nloyfer/wgbs_tools]
+- NEB's [mark-nonconverted-reads.py package](https://github.com/nebiolabs/mark-nonconverted-reads)
+- [wgbs_tools](https://github.com/nloyfer/wgbs_tools)
 
 
-### Random thoughts
-
-Trim galore:
-`trim_galore --paired --quality 20 --phred33 --illumina --stringency 1 -e 0.1 --gzip --length 20 --output_dir WHAT --clip_R2 5? --cores 4 `
+## Trimming Parameters
  
  --nextseq INT?: see https://sequencing.qcfail.com/articles/illumina-2-colour-chemistry-can-overcall-high-confidence-g-bases/
  This sets --nextseq-trim=3'CUTOFF within Cutadapt and ignores G base quality -- mutually exclusive with -q
