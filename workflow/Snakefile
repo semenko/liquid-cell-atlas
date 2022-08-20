@@ -19,11 +19,11 @@ import pandas as pd
 from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 
 # TODO: Unify these / symlink from the data path?
-CONFIG_FILE_PATH = "/home/nsemenkovich/liquid-cell-atlas/data/internal"
+CONFIG_FILE_PATH = "/logo2/lca_data" # home/nsemenkovich/liquid-cell-atlas/data/internal"
 DATA_PATH = "/logo2/lca_data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{CONFIG_FILE_PATH}/melanoma.csv")
+data_config_files = glob.glob(f"{CONFIG_FILE_PATH}/test.csv")
 
 
 # Store a big table of all our experiment .csvs
@@ -95,6 +95,7 @@ rule get_reference_genome:
 # U2AF1 masking file details: https://genomeref.blogspot.com/2021/07/one-of-these-things-doest-belong.html
 # Encode DAC Exclusion List details: https://www.encodeproject.org/annotations/ENCSR636HFF/
 rule mask_reference_fasta:
+    # TODO: Consider a more modular env definition? (one per rule / rule group?)
     conda: "envs/env.yaml"
     input:
         u1af1_exclusion = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True),
@@ -175,16 +176,16 @@ rule fastp:
         fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/report.html"
     log:
         fastp_err = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.log.txt"
-    threads: 4
+    threads: 1
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
         # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
         # TODO: make this selective for NextSeq-only runs?
         # e.g.:
         #    inst_name=$(zcat -f '!{fq_set.insert_read1}' | head -n 1 | cut -f 1 -d ':' | sed 's/^@//')
-        #    fastq_barcode=$(zcat -f '!{fq_set.insert_read1}' | head -n 1 | sed -r 's/.*://')
         #    if [[ "${inst_name:0:2}" == 'A0' ]] || [[ "${inst_name:0:2}" == 'NS' ]] || \
         #       [[ "${inst_name:0:2}" == 'NB' ]] || [[ "${inst_name:0:2}" == 'VH' ]] ; then
+        # trim_poly_g_flag = "--trim_poly_g" if {input...}.startswith(tuple(["@A0", "@NS", "@NB", "@VH"])) else "",
         trim_poly_g_flag = "--trim_poly_g",
 
         # Trim specific to BS vs EM-seq input type
@@ -222,12 +223,14 @@ rule bwa_meth:
         bwa_meth_indices = rules.bwa_meth_index.output
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam"))
+    params:
+        # TODO: Should we include the platform or barcode here? Does that have value for us?
+        read_group = "@RG\\tID:{sample}\\tSM:{sample}"
     log:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/bwameth/log.txt"
-    threads: 4
+    threads: 30
     shell:
-        # TODO: include --read-group @RG\\tID:${fastq_barcode}\\tSM:!{fq_set.library}
-        "bwameth.py -p -t {threads} --read-group @RG\\tID:${fastq_barcode}\\tSM:!{fq_set.library} --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
+        "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
 
 
 ### mark nonconverted reads
@@ -250,26 +253,25 @@ rule mark_nonconverted:
         # TODO: Fix this path
         "cat {input.aligned_sam} | /home/nsemenkovich/sandbox/mark-nonconverted-reads/mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>{log.nonconverted} >{output}"
 
-### sort
+### sort by name
 # Coordinate sort our input sam, and stream as a sam (no bam yet)
-rule samtools_sort:
+rule samtools_sort_name:
     conda: "envs/env.yaml"
     input:
         "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"
     output:
-        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/sorted.sam"))
+        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/name-sorted.sam"))
     log:
-        sort = "{DATA_PATH}/{experiment}/{sample}/samtools/sort.log.txt"
+        sort = "{DATA_PATH}/{experiment}/{sample}/samtools/name-sort.log.txt"
     shell:
-        "cat {input} | samtools sort --output-fmt SAM --threads {threads} - 2>{log.sort} >{output}"
-
+        "cat {input} | samtools sort -n --output-fmt SAM --threads {threads} - 2>{log.sort} >{output}"
 
 ### fixmate
 # We need to ad ms and MC tags for markdup to run next
 rule samtools_fixmate:
     conda: "envs/env.yaml"
     input:
-        "{DATA_PATH}/{experiment}/{sample}/samtools/sorted.sam"
+        "{DATA_PATH}/{experiment}/{sample}/samtools/name-sorted.sam"
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"))
     log:
@@ -279,14 +281,28 @@ rule samtools_fixmate:
         # -m add mate score tag
         "cat {input} | samtools fixmate -u -m --output-fmt SAM --threads {threads} - - 2>{log.fixmate} >{output}"
 
+        
+### sort by position
+# Coordinate sort our input sam, and stream as a sam (no bam yet)
+rule samtools_sort_pos:
+    conda: "envs/env.yaml"
+    input:
+        "{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"
+    output:
+        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/pos-sorted.sam"))
+    log:
+        sort = "{DATA_PATH}/{experiment}/{sample}/samtools/pos-sort.log.txt"
+    shell:
+        "cat {input} | samtools sort --output-fmt SAM --threads {threads} - 2>{log.sort} >{output}"
 
+        
 ### markdup
 # Mark duplicates from a .bam file
 # NOTE: This is the final step in the core alignment pipeline: markdup writes a (lightly) compressed .bam file and index.
 rule samtools_markdup:
     conda: "envs/env.yaml"
     input:
-        "{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"
+      "{DATA_PATH}/{experiment}/{sample}/samtools/pos-sorted.sam"
     output:
         bam = protected("{DATA_PATH}/{experiment}/{sample}/aligned.bam"),
         stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.txt",
@@ -346,7 +362,7 @@ rule fastqc_bam:
     input:
         rules.samtools_markdup.output.bam
     output:
-        "{DATA_PATH}/{experiment}/{sample}/fastqc/{sample}_fastqc.html"
+        "{DATA_PATH}/{experiment}/{sample}/fastqc/aligned_fastqc.html"
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/fastqc/",
     log:
@@ -357,11 +373,25 @@ rule fastqc_bam:
         fastqc --outdir {params.out_dir} {input} >{log} 2>&1
         """
 
+### samtools index
+rule samtools_index:
+    conda: "envs/env.yaml"
+    input:
+        rules.samtools_markdup.output.bam
+    output:
+        "{DATA_PATH}/{experiment}/{sample}/aligned.bam.bai"
+    log:
+        "{DATA_PATH}/{experiment}/{sample}/samtools/index.log.txt"
+    shell:
+        # Note: the markdup makes a .csi index, but we also like .bai's
+        "samtools index -b {input} >{log} 2>&1"
+        
 ### goleft indexcov
 rule goleft_indexcov:
     conda: "envs/env.yaml"
     input:
-        rules.samtools_markdup.output.bam
+        bam = rules.samtools_markdup.output.bam,
+        index = rules.samtools_index.output
     output:
         "{DATA_PATH}/{experiment}/{sample}/goleft/index.html"
     log:
@@ -370,7 +400,7 @@ rule goleft_indexcov:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/goleft/"
     shell:
         # TODO: Run on all .bam files? Multiple from one project? All from a given sequencing batch?
-        "goleft indexcov --directory {params.out_dir} {input} >{log} 2>&1"
+        "goleft indexcov --directory {params.out_dir} {input.bam} >{log} 2>&1"
 
 
 ### DeepTools bias plots
@@ -434,8 +464,9 @@ rule multiqc:
     output:
         "{DATA_PATH}/{experiment}/{sample}/multiqc/multiqc_report.html"
     params:
+        in_dir = "{DATA_PATH}/{experiment}/{sample}/",
         out_dir = "{DATA_PATH}/{experiment}/{sample}/multiqc/"
     log:
         "{DATA_PATH}/{experiment}/{sample}/multiqc/multiqc.log.txt"
     shell:
-        "multiqc --outdir {params.outdir} --verbose {} >{log} 2>&1"
+        "multiqc --outdir {params.out_dir} --verbose {params.in_dir} >{log} 2>&1"
