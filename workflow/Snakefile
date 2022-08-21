@@ -253,25 +253,13 @@ rule mark_nonconverted:
         # TODO: Fix this path
         "cat {input.aligned_sam} | /home/nsemenkovich/sandbox/mark-nonconverted-reads/mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>{log.nonconverted} >{output}"
 
-### sort by name
-# Coordinate sort our input sam, and stream as a sam (no bam yet)
-rule samtools_sort_name:
-    conda: "envs/env.yaml"
-    input:
-        "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"
-    output:
-        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/name-sorted.sam"))
-    log:
-        sort = "{DATA_PATH}/{experiment}/{sample}/samtools/name-sort.log.txt"
-    shell:
-        "cat {input} | samtools sort -n --output-fmt SAM --threads {threads} - 2>{log.sort} >{output}"
 
 ### fixmate
 # We need to ad ms and MC tags for markdup to run next
 rule samtools_fixmate:
     conda: "envs/env.yaml"
     input:
-        "{DATA_PATH}/{experiment}/{sample}/samtools/name-sorted.sam"
+        "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"))
     log:
@@ -302,7 +290,7 @@ rule samtools_sort_pos:
 rule samtools_markdup:
     conda: "envs/env.yaml"
     input:
-      "{DATA_PATH}/{experiment}/{sample}/samtools/pos-sorted.sam"
+        "{DATA_PATH}/{experiment}/{sample}/samtools/pos-sorted.sam"
     output:
         bam = protected("{DATA_PATH}/{experiment}/{sample}/aligned.bam"),
         stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.txt",
