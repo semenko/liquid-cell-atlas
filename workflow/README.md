@@ -27,7 +27,7 @@ You can see a good explanation of the rationale for some of these components at 
 ## Requirements
 
 All software requirements are specified in `env.yaml` except for:
-- NEB's [mark-nonconverted-reads.py package](https://github.com/nebiolabs/mark-nonconverted-reads)
+- NEB's [mark-nonconverted-reads.py package](https://github.com/nebiolabs/mark-nonconverted-reads) -- which is a git submodule here
 - [wgbs_tools](https://github.com/nloyfer/wgbs_tools)
 
 
