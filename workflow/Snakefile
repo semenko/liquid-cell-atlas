@@ -21,8 +21,10 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
+# Uncomment for test runs
+data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -53,6 +55,7 @@ all_experiments_data = all_experiments_df[['experiment', 'sample_id', 'path_R1',
 # For building a sample list for Snakemake
 ALL_SAMPLES_LIST.extend(all_experiments_data)
 
+# Remove in prod
 print(ALL_SAMPLES_LIST)
 
 ###############
@@ -169,7 +172,7 @@ rule fastp:
         fastp_json = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.json",
         fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.html"
     log:
-        fastp_err = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.log.txt"
+        fastp_err = "{DATA_PATH}/{experiment}/{sample}/logs/fastp.log.txt"
     threads: 1  # One thread is never rate-limiting here
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
@@ -223,7 +226,7 @@ rule bwa_meth:
         # TODO: Should we include the platform or barcode here? Does that have value for us?
         read_group = "@RG\\tID:{sample}\\tSM:{sample}"
     log:
-        bwameth_err = "{DATA_PATH}/{experiment}/{sample}/bwameth/log.txt"
+        bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
     threads: 30
     shell:
         "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
@@ -242,7 +245,7 @@ rule mark_nonconverted:
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"))
     log:
-        nonconverted = "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconverted.log.txt"
+        nonconverted = "{DATA_PATH}/{experiment}/{sample}/logs/mark-nonconverted.log.txt"
     params:
         threshold = 3 # If 3 nonconverted Cs on a read, consider it nonconverted
     shell:
@@ -259,7 +262,7 @@ rule samtools_fixmate:
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"))
     log:
-        fixmate = "{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.log.txt"
+        fixmate = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt"
     shell:
         # -u uncompressed output
         # -m add mate score tag
@@ -275,7 +278,7 @@ rule samtools_sort_pos:
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/pos-sorted.sam"))
     log:
-        sort = "{DATA_PATH}/{experiment}/{sample}/samtools/pos-sort.log.txt"
+        sort = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt"
     shell:
         "cat {input} | samtools sort --output-fmt SAM --threads {threads} - 2>{log.sort} >{output}"
 
@@ -291,7 +294,7 @@ rule samtools_markdup:
         bam = protected("{DATA_PATH}/{experiment}/{sample}/aligned.bam"),
         stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.txt",
     log:
-        markdup = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.log.txt"
+        markdup = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-markdup.log.txt"
     shell:
         # TODO: Mark supplementary reads of duplicates as duplicates? (-S)
         # TODO: Specify index name if requred? "-##idx##indexname"
@@ -313,9 +316,9 @@ rule samtools_statistics:
         idxstats = "{DATA_PATH}/{experiment}/{sample}/samtools/idxstats.txt",
         stats = "{DATA_PATH}/{experiment}/{sample}/samtools/stats.txt",
     log:
-        flagstat = "{DATA_PATH}/{experiment}/{sample}/samtools/flagstat.log.txt",
-        idxstats = "{DATA_PATH}/{experiment}/{sample}/samtools/idxstats.log.txt",
-        stats = "{DATA_PATH}/{experiment}/{sample}/samtools/stats.log.txt"
+        flagstat = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-flagstat.log.txt",
+        idxstats = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-idxstats.log.txt",
+        stats = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-stats.log.txt"
     shell:
         """
         samtools flagstat {input} 2>{log.flagstat} >{output.flagstat}
@@ -334,7 +337,7 @@ rule methyldackel_mbias_plots:
         mbias_ot = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias_OT.svg",
         mbias_ob = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias_OB.svg"
     log:
-        "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias.log.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/methyldackel-mbias.log.txt"
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias"
     threads: 1
@@ -351,7 +354,7 @@ rule fastqc_bam:
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/fastqc/",
     log:
-        "{DATA_PATH}/{experiment}/{sample}/fastqc/fastqc.log.txt"   
+        "{DATA_PATH}/{experiment}/{sample}/logs/fastqc.log.txt"
     shell:
         """
         mkdir -p {params.out_dir}
@@ -366,7 +369,7 @@ rule samtools_index:
     output:
         "{DATA_PATH}/{experiment}/{sample}/aligned.bam.bai"
     log:
-        "{DATA_PATH}/{experiment}/{sample}/samtools/index.log.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/samtools-index-bai.log.txt"
     shell:
         # Note: the markdup makes a .csi index, but we also like .bai's
         "samtools index -b {input} >{log} 2>&1"
@@ -380,7 +383,7 @@ rule goleft_indexcov:
     output:
         "{DATA_PATH}/{experiment}/{sample}/goleft/index.html"
     log:
-        "{DATA_PATH}/{experiment}/{sample}/goleft/goleft.log.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/goleft.log.txt"
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/goleft/"
     shell:
@@ -426,7 +429,7 @@ rule wgbs_tools_pat_beta:
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.beta"
         # TODO: What's the mbias output?
     log:
-        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/bam2pat.log.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/wgbs_tools-bam2pat.log.txt"
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/"
     threads: 1
@@ -452,6 +455,6 @@ rule multiqc:
         in_dir = "{DATA_PATH}/{experiment}/{sample}/",
         out_dir = "{DATA_PATH}/{experiment}/{sample}/multiqc/"
     log:
-        "{DATA_PATH}/{experiment}/{sample}/multiqc/multiqc.log.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/multiqc.log.txt"
     shell:
         "multiqc --outdir {params.out_dir} --force --verbose --exclude snippy {params.in_dir} >{log} 2>&1"

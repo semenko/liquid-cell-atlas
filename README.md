@@ -35,18 +35,6 @@ To kick off this project, we've broken out key tasks into individual folders. On
     * CyTOF & FACS Data
     * Stats & Graphs
 
-
-## Architecture
-
-```mermaid
-graph TD;
-    A-->B;
-    A-->C;
-    B-->D;
-    C-->D;
-```
-
-
 ## License
 
 Not yet determined. For now, all rights reserved. At time of publication, we may consider GPL/MIT, etc. depending on commercial licensing thoughts.
