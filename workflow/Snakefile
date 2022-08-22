@@ -249,8 +249,7 @@ rule mark_nonconverted:
     params:
         threshold = 3 # If 3 nonconverted Cs on a read, consider it nonconverted
     shell:
-        # TODO: Add this as a submodule?
-        "cat {input.aligned_sam} | /home/nsemenkovich/sandbox/mark-nonconverted-reads/mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>{log.nonconverted} >{output}"
+        "cat {input.aligned_sam} | mark-nonconverted-reads/mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>{log.nonconverted} >{output}"
 
 
 ### fixmate, sort, and markdup
