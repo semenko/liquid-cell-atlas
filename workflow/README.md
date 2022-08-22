@@ -2,14 +2,6 @@
 
 A standardized WGBS pre-processing pipeline for our internally generated WGBS bisulfite & EM-seq data. This goes from .fastq to methylation calls (via bwa-meth) and extensive QC and plotting, using a snakemake pipeline.
 
-## Pipeline Overview
-
-Here's a high-level overview of the Snakemake pipeline, generated via `snakemake --rulegraph | dot -Tpng > rules.png`
-
-<p align="center">
-<img src="https://user-images.githubusercontent.com/167135/185484931-ccfa0549-6898-44e1-9be2-ee0cf25ee6b2.png" width="500">
-</p>
-
 ## Background & Trimming Approach
 
 I strongly suggest reading work from Felix Krueger (author of Bismark) as background. In particular:
@@ -52,3 +44,12 @@ For paired-end BS-Seq, it is recommended to remove the first few bp because the 
 
 `--clip_R1 5 --clip_R2 3 --three_prime_clip_R1 1 --three_prime_clip_R2 1`
 --dovetail ?
+
+
+## Pipeline Graph
+
+Here's a high-level overview of the Snakemake pipeline, generated via `snakemake --rulegraph | dot -Tpng > rules.png`
+
+<p align="center">
+<img src="https://user-images.githubusercontent.com/167135/185484931-ccfa0549-6898-44e1-9be2-ee0cf25ee6b2.png" width="500">
+</p>
