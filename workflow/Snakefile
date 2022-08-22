@@ -327,7 +327,8 @@ rule methyldackel_mbias_plots:
     conda: "envs/env.yaml"
     input:
         bam = rules.samtools_fixmate_sort_markdup.output.bam,
-        reference = rules.mask_reference_fasta.output.masked_reference_genome
+        reference = rules.mask_reference_fasta.output.masked_reference_genome,
+        index = rules.samtools_index.output
     output:
         mbias_txt = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias.txt",
         mbias_ot = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias_OT.svg",
