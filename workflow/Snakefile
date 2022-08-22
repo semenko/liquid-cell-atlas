@@ -18,12 +18,10 @@ import re
 import pandas as pd
 from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 
-# TODO: Unify these / symlink from the data path?
-CONFIG_FILE_PATH = "/logo2/lca_data" # home/nsemenkovich/liquid-cell-atlas/data/internal"
-DATA_PATH = "/logo2/lca_data"
+DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{CONFIG_FILE_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 
 # Store a big table of all our experiment .csvs
@@ -55,10 +53,6 @@ all_experiments_data = all_experiments_df[['experiment', 'sample_id', 'path_R1',
 # For building a sample list for Snakemake
 ALL_SAMPLES_LIST.extend(all_experiments_data)
 
-
-##### FOR DEVELOPMENT
-# Only one:
-ALL_SAMPLES_LIST = [ALL_SAMPLES_LIST[0]]
 print(ALL_SAMPLES_LIST)
 
 ###############
