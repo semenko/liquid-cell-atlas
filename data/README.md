@@ -1,6 +1,6 @@
 # Sequencing Data
 
-A collection of our sequencing data. Raw files aren't stored on github (internally, they're symlinked / mounted from different volumes). Our published data can be download via *** and in the public domain. Third party data (e.g. ENCODE and BLUEPRINT) are covered by their own 3rd party licenses.
+A collection of our sequencing data. Raw files aren't stored on Github (internally, they're symlinked / mounted from different volumes). Our published data can be downloaded via ***.
 
 These directories are parsed by snakemake and the preprocessing/analytical pipelines.
   
@@ -11,7 +11,25 @@ These directories are parsed by snakemake and the preprocessing/analytical pipel
 | healthy_pbmc | PBMCs from healthy donors, sometimes with cytometry data available. |
 | melanoma | Melanoma patient samples as part of a collaboration with Yale, including patients undergoing immunotherapy. |
 | crc | Colorectal tumor samples, including tumor, cfDNA, and sorted populations. |
+| test | A single test sample for processing. |
 
+## Data Structure
+
+Raw data files are processed and analyzed by our [Snakemake workflow](../workflow). Within each project directory, the output is (roughly) structured as:
+
+    melanoma/
+    │   aligned.sam             # The final alignment file (along with indices)
+    ├── raw/
+    │   ├── ...fastq.gz         # Raw reads
+    │   └── subsampled/         # Subsampled reads for rapid analyses
+    ├── bwameth/                # bwameth logs 
+    ├── fastp/                  # fastp statistics & logs
+    ├── fastqc/                 # fastqc graphs 
+    ├── goleft/                 # goleft coverage plots
+    ├── methyldackel/           # mbias plots
+    ├── multiqc/                # multiqc stats
+    ├── samtools/               # samtools log data
+    └── wgbs_tools/             # wgbs_tools .bam/.pat files
 
 ## Sample Definition Files
 
