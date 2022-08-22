@@ -1,6 +1,6 @@
-# Raw Sequencing Preprocessing
+# Raw Sequencing Processing
 
-A standardized WGBS pre-processing pipeline for our internally generated WGBS bisulfite & EM-seq data. This goes from .fastq to methylation calls (via bwa-meth) and extensive QC and plotting, using a snakemake pipeline.
+A standardized WGBS pipeline for our internally generated WGBS bisulfite & EM-seq data. This goes from .fastq to methylation calls (via bwa-meth) and extensive QC and plotting, using a Snakemake pipeline.
 
 ## Background & Trimming Approach
 
