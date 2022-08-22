@@ -249,68 +249,65 @@ rule mark_nonconverted:
     params:
         threshold = 3 # If 3 nonconverted Cs on a read, consider it nonconverted
     shell:
-        # TODO: Fix this path
+        # TODO: Add this as a submodule?
         "cat {input.aligned_sam} | /home/nsemenkovich/sandbox/mark-nonconverted-reads/mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>{log.nonconverted} >{output}"
 
 
-### fixmate
-# We need to ad ms and MC tags for markdup to run next
-rule samtools_fixmate:
-    conda: "envs/env.yaml"
-    input:
-        "{DATA_PATH}/{experiment}/{sample}/samtools/nonconv-marked.sam"
-    output:
-        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"))
-    log:
-        fixmate = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt"
-    shell:
-        # -u uncompressed output
-        # -m add mate score tag
-        "cat {input} | samtools fixmate -u -m --output-fmt SAM --threads {threads} - - 2>{log.fixmate} >{output}"
-
-        
-### sort by position
-# Coordinate sort our input sam, and stream as a sam (no bam yet)
-rule samtools_sort_pos:
-    conda: "envs/env.yaml"
-    input:
-        "{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"
-    output:
-        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/pos-sorted.sam"))
-    log:
-        sort = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt"
-    shell:
-        "cat {input} | samtools sort --output-fmt SAM --threads {threads} - 2>{log.sort} >{output}"
-
-        
-### markdup
-# Mark duplicates from a .bam file
+### fixmate, sort, and markdup
+## These were originally cleanly added as named pipes between snakemake blocks,
+## but I ran into a group bug that I couldn't work around: https://github.com/snakemake/snakemake/issues/1822 
+## So now we're one large block shell command *shrug*.
 # NOTE: This is the final step in the core alignment pipeline: markdup writes a (lightly) compressed .bam file and index.
-rule samtools_markdup:
+rule samtools_fixmate_sort_markdup:
     conda: "envs/env.yaml"
     input:
-        "{DATA_PATH}/{experiment}/{sample}/samtools/pos-sorted.sam"
+        rules.mark_nonconverted.output
     output:
         bam = protected("{DATA_PATH}/{experiment}/{sample}/aligned.bam"),
-        stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.txt",
+        stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.txt"
     log:
+        fixmate = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt",
+        sort = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt",
         markdup = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-markdup.log.txt"
+    threads: 1
     shell:
+        # fixmate is needed for markdup -- it adds ms and MC tags
+        # fixmate: -u uncompressed output / -m add mate score tag
+        # sort: coodinate sorted, uncompressed sam
         # TODO: Mark supplementary reads of duplicates as duplicates? (-S)
         # TODO: Specify index name if requred? "-##idx##indexname"
-        # We output with compress level 1 (lowest)
-        "cat {input} | samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {threads} - {output.bam} 2>{log.markdup}"
+        """
+        cat {input} | samtools fixmate -u -m --output-fmt SAM --threads {threads} - - 2>{log.fixmate} | \
+        samtools sort --output-fmt SAM --threads {threads} - 2>{log.sort} | \
+        samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {threads} - {output.bam} 2> {log.markdup}
+        """
 
 
 ###############
 ### Statistics and QC Graphs
 ###############
 
+### samtools index
+rule samtools_index:
+    conda: "envs/env.yaml"
+    input:
+        rules.samtools_fixmate_sort_markdup.output.bam
+    output:
+        "{DATA_PATH}/{experiment}/{sample}/aligned.bam.bai"
+    log:
+        "{DATA_PATH}/{experiment}/{sample}/logs/samtools-index-bai.log.txt"
+    shell:
+        # Note: the markdup makes a .csi index, but we also like .bai's
+        "samtools index -b {input} >{log} 2>&1"
+
 ### samtools statistics
 rule samtools_statistics:
     conda: "envs/env.yaml"
     input:
-        rules.samtools_markdup.output.bam
+        bam = rules.samtools_fixmate_sort_markdup.output.bam,
+        # Note: we can operate on the .csi index above, but I worry there's a race where
+        # we spawn up idxstats but we only just started writing to a .bai as well
+        index = rules.samtools_index.output
     output:
         flagstat = "{DATA_PATH}/{experiment}/{sample}/samtools/flagstat.txt",
         idxstats = "{DATA_PATH}/{experiment}/{sample}/samtools/idxstats.txt",
@@ -321,16 +318,16 @@ rule samtools_statistics:
         stats = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-stats.log.txt"
     shell:
         """
-        samtools flagstat {input} 2>{log.flagstat} >{output.flagstat}
-        samtools idxstats {input} 2>{log.idxstats} >{output.idxstats}
-        samtools stats {input} 2>{log.stats} >{output.stats}
+        samtools flagstat {input.bam} 2>{log.flagstat} >{output.flagstat}
+        samtools idxstats {input.bam} 2>{log.idxstats} >{output.idxstats}
+        samtools stats {input.bam} 2>{log.stats} >{output.stats}
         """
 
 ### MethylDackel mbias
 rule methyldackel_mbias_plots:
     conda: "envs/env.yaml"
     input:
-        bam = rules.samtools_markdup.output.bam,
+        bam = rules.samtools_fixmate_sort_markdup.output.bam,
         reference = rules.mask_reference_fasta.output.masked_reference_genome
     output:
         mbias_txt = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias.txt",
@@ -348,7 +345,7 @@ rule methyldackel_mbias_plots:
 rule fastqc_bam:
     conda: "envs/env.yaml"
     input:
-        rules.samtools_markdup.output.bam
+        rules.samtools_fixmate_sort_markdup.output.bam
     output:
         "{DATA_PATH}/{experiment}/{sample}/fastqc/aligned_fastqc.html"
     params:
@@ -360,25 +357,12 @@ rule fastqc_bam:
         mkdir -p {params.out_dir}
         fastqc --outdir {params.out_dir} {input} >{log} 2>&1
         """
-
-### samtools index
-rule samtools_index:
-    conda: "envs/env.yaml"
-    input:
-        rules.samtools_markdup.output.bam
-    output:
-        "{DATA_PATH}/{experiment}/{sample}/aligned.bam.bai"
-    log:
-        "{DATA_PATH}/{experiment}/{sample}/logs/samtools-index-bai.log.txt"
-    shell:
-        # Note: the markdup makes a .csi index, but we also like .bai's
-        "samtools index -b {input} >{log} 2>&1"
         
 ### goleft indexcov
 rule goleft_indexcov:
     conda: "envs/env.yaml"
     input:
-        bam = rules.samtools_markdup.output.bam,
+        bam = rules.samtools_fixmate_sort_markdup.output.bam,
         index = rules.samtools_index.output
     output:
         "{DATA_PATH}/{experiment}/{sample}/goleft/index.html"
@@ -397,7 +381,7 @@ rule goleft_indexcov:
 rule deeptools_bias_plots:
     conda: "envs/env.yaml"
     input:
-        # rules.samtools_markdup.output.bam
+        # rules.samtools_fixmate_sort_markdup.output.bam
     output:
     threads: 1
     shell:
@@ -422,7 +406,7 @@ rule wgbs_tools_index:
 rule wgbs_tools_pat_beta:
     conda: "envs/env.yaml"
     input:
-        bam = rules.samtools_markdup.output.bam,
+        bam = rules.samtools_fixmate_sort_markdup.output.bam,
         index = rules.wgbs_tools_index.output
     output:
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.pat.gz",
