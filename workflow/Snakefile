@@ -172,15 +172,15 @@ rule fastp:
     output:
         fastp_pipe_output = temp(pipe("{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa")),
         fastp_failed = "{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa",  # Length < 10
-        fastp_json = "{DATA_PATH}/{experiment}/{sample}/fastp/report.json",
-        fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/report.html"
+        fastp_json = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.json",
+        fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.html"
     log:
         fastp_err = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.log.txt"
-    threads: 1
+    threads: 1  # One thread is never rate-limiting here
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
         # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
-        # TODO: make this selective for NextSeq-only runs?
+        # TODO: make this selective for NextSeq/NovaSeq-only runs?
         # e.g.:
         #    inst_name=$(zcat -f '!{fq_set.insert_read1}' | head -n 1 | cut -f 1 -d ':' | sed 's/^@//')
         #    if [[ "${inst_name:0:2}" == 'A0' ]] || [[ "${inst_name:0:2}" == 'NS' ]] || \
@@ -188,7 +188,9 @@ rule fastp:
         # trim_poly_g_flag = "--trim_poly_g" if {input...}.startswith(tuple(["@A0", "@NS", "@NB", "@VH"])) else "",
         trim_poly_g_flag = "--trim_poly_g",
 
-        # Trim specific to BS vs EM-seq input type
+        # Note: --overrepresentation_analysis was overwhelming with our huge sequencing data, disabled for now.
+
+        # TODO: Trim specific to BS vs EM-seq input type
         trim_r1_5prime = "10",
         trim_r1_3prime = "10",
         trim_r2_5prime = "10",
@@ -205,7 +207,7 @@ rule fastp:
         --trim_front1 {params.trim_r1_5prime} --trim_tail1 {params.trim_r1_3prime} \
         --trim_front2 {params.trim_r2_5prime} --trim_tail2 {params.trim_r2_3prime} \
         --length_required {params.minimum_length} --disable_quality_filtering {params.trim_poly_g_flag} \
-        --overrepresentation_analysis --adapter_sequence "{params.adapter_r1}" --adapter_sequence_r2 "{params.adapter_r2}" \
+        --adapter_sequence "{params.adapter_r1}" --adapter_sequence_r2 "{params.adapter_r2}" \
         --json "{output.fastp_json}" --html "{output.fastp_html}" \
         --thread {threads} --verbose --failed_out {output.fastp_failed} --stdout \
         2>{log.fastp_err} >{output.fastp_pipe_output}
@@ -334,12 +336,13 @@ rule methyldackel_mbias_plots:
         bam = rules.samtools_markdup.output.bam,
         reference = rules.mask_reference_fasta.output.masked_reference_genome
     output:
-        mbias_txt = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias.txt"
-        # TODO: add the mbias plot path?
+        mbias_txt = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias.txt",
+        mbias_ot = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias_OT.svg",
+        mbias_ob = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias_OB.svg"
     log:
         "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias.log.txt"
     params:
-        out_dir = "{DATA_PATH}/{experiment}/{sample}/methyldackel/"
+        out_dir = "{DATA_PATH}/{experiment}/{sample}/methyldackel/mbias"
     threads: 1
     shell:
         "MethylDackel mbias -@ {threads} --txt {input.reference} {input.bam} {params.out_dir} 2>{log} >{output.mbias_txt}"
