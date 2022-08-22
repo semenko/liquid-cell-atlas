@@ -145,8 +145,8 @@ rule md5sum:
         r1_file = lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/" + all_experiments_df.loc[wildcards.sample, 'path_R1'],
         r2_file = lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/" + all_experiments_df.loc[wildcards.sample, 'path_R2'],
     output:
-        checksums = "{DATA_PATH}/{experiment}/{sample}/raw/known.md5",
-        validated = "{DATA_PATH}/{experiment}/{sample}/raw/validated.md5"
+        checksums = "{DATA_PATH}/{experiment}/{sample}/logs/md5.known.txt",
+        validated = "{DATA_PATH}/{experiment}/{sample}/logs/md5.validated.txt"
     params:
         r1_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R1'],
         r2_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R2']
@@ -221,7 +221,7 @@ rule bwa_meth:
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
         bwa_meth_indices = rules.bwa_meth_index.output
     output:
-        temp(pipe("{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam"))
+        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam"))
     params:
         # TODO: Should we include the platform or barcode here? Does that have value for us?
         read_group = "@RG\\tID:{sample}\\tSM:{sample}"
@@ -240,10 +240,10 @@ rule bwa_meth:
 rule mark_nonconverted:
     conda: "envs/env.yaml"
     input:
-        aligned_sam = "{DATA_PATH}/{experiment}/{sample}/bwameth/raw.sam",
+        aligned_sam = "{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome
     output:
-        temp(pipe("{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"))
+        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/nonconv-marked.sam"))
     log:
         nonconverted = "{DATA_PATH}/{experiment}/{sample}/logs/mark-nonconverted.log.txt"
     params:
@@ -258,7 +258,7 @@ rule mark_nonconverted:
 rule samtools_fixmate:
     conda: "envs/env.yaml"
     input:
-        "{DATA_PATH}/{experiment}/{sample}/bwameth/nonconv-marked.sam"
+        "{DATA_PATH}/{experiment}/{sample}/samtools/nonconv-marked.sam"
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/fixmate.sam"))
     log:
