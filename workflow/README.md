@@ -2,16 +2,6 @@
 
 A standardized WGBS pipeline for our internally generated WGBS bisulfite & EM-seq data. This goes from .fastq to methylation calls (via bwa-meth) and extensive QC and plotting, using a Snakemake pipeline.
 
-## Background & Trimming Approach
-
-I strongly suggest reading work from Felix Krueger (author of Bismark) as background. In particular:
-- TrimGalore's [RRBS guide](https://github.com/FelixKrueger/TrimGalore/blob/master/Docs/RRBS_Guide.pdf)
-- The Babraham [WGBS/RRBS tutorials](https://www.bioinformatics.babraham.ac.uk/training.html#bsseq)
-
-For similar pipelines and inspiration, see:
-- NEB's [EM-seq pipeline](https://github.com/nebiolabs/EM-seq/)
-- Felix Krueger's [Nextflow WGBS Pipeline](https://github.com/FelixKrueger/nextflow_pipelines/blob/master/nf_bisulfite_WGBS)
-- The Snakepipes [WGBS pipeline](https://snakepipes.readthedocs.io/en/latest/content/workflows/WGBS.html)
 
 ## Reference Genome
 
@@ -28,16 +18,36 @@ You can see a good explanation of the rationale for some of these components at 
 
 All software requirements are specified in `env.yaml` except for:
 - NEB's [mark-nonconverted-reads.py package](https://github.com/nebiolabs/mark-nonconverted-reads) -- which is a git submodule here
-- [wgbs_tools](https://github.com/nloyfer/wgbs_tools)
+- [wgbs_tools](https://github.com/nloyfer/wgbs_tools) —- not currently built due to its complexity (TODO: build this dynamically? check its existence in the Snakemake file?)
+
+## Trimming Approach
+
+For **EMseq**, I trim ***
+
+For **BSseq**, I trim ***
+
+For all reads, I set `--trim_poly_g`, and set a `--length_required` (minimum read length) of 10 bp.
+
+Notably I do NOT do quality filtering here (I set `--disable_quality_filtering`), and save this for downstream analyses as desired.
+
+## Background & Inspiration
+
+I strongly suggest reading work from Felix Krueger (author of Bismark) as background. In particular:
+- TrimGalore's [RRBS guide](https://github.com/FelixKrueger/TrimGalore/blob/master/Docs/RRBS_Guide.pdf)
+- The Babraham [WGBS/RRBS tutorials](https://www.bioinformatics.babraham.ac.uk/training.html#bsseq)
+
+For similar pipelines and inspiration, see:
+- NEB's [EM-seq pipeline](https://github.com/nebiolabs/EM-seq/)
+- Felix Krueger's [Nextflow WGBS Pipeline](https://github.com/FelixKrueger/nextflow_pipelines/blob/master/nf_bisulfite_WGBS)
+- The Snakepipes [WGBS pipeline](https://snakepipes.readthedocs.io/en/latest/content/workflows/WGBS.html)
 
 
-## Trimming Parameters
- 
+## Random Notes
  --nextseq INT?: see https://sequencing.qcfail.com/articles/illumina-2-colour-chemistry-can-overcall-high-confidence-g-bases/
  This sets --nextseq-trim=3'CUTOFF within Cutadapt and ignores G base quality -- mutually exclusive with -q
 
-Very stringend emseq clipping? https://github.com/FelixKrueger/Bismark/issues/419
---clip_R1 10 --clip_R2 10 ?
+EMseq 10 / 10 clipping? --clip_R1 10 --clip_R2 10 https://github.com/FelixKrueger/Bismark/issues/419
+
 """
 For paired-end BS-Seq, it is recommended to remove the first few bp because the end-repair reaction may introduce a bias towards low methylation. Please refer to the M-bias plot section in the Bismark User Guide for some examples.
 """
