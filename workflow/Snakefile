@@ -30,13 +30,24 @@ data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 all_experiments_df = pd.DataFrame()
 
 for filename in data_config_files:
+    # The experiment "name", which is also the path prefix, e.g. crc / melanoma
     experiment = pathlib.Path(filename).stem
 
     # Load the .csv of our sample data
     experiment_df = pd.read_table(filename, delimiter=",").set_index("sample_id", drop=False)
 
-    # Shove in the "experiment" as a column
-    experiment_df['experiment'] = experiment
+    experiment_df['experiment'] = experiment 
+
+    # If the subsampled flag is enabled, that means we're *operating* on subsampled data
+    # (We're not making it -- it's made on regular / full runs.)
+    if "subsampled" in config:
+        # So we'll append the _subsampled suffix to experiments
+        experiment_df['experiment'] = experiment + "_subsampled"
+
+        # Note that subsampled data all have the same path data, and technically md5 doesn't matter
+        experiment_df = experiment_df.assign(path_R1='R1.fastq.gz', path_R2='R2.fastq.gz')
+        experiment_df = experiment_df.assign(md5sum_R1=None, md5sum_R2=None)
+
 
     # Append to one mega dataframe of all experiments
     all_experiments_df = pd.concat([all_experiments_df, experiment_df])
@@ -60,12 +71,14 @@ print(ALL_SAMPLES_LIST)
 
 ###############
 # Snakemake is a little funny.
-# The first function here just defines what *output* we want when the whole pipeline is done.
+# The first function here just defines what *output* we expect when the whole pipeline is done.
 ###############
 rule all:
     input:
-        # For now, flagstat is our last step
-        [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST]
+        # If you do NOT pass the subsampled flag, then we'll generate subsampled reads (from the full .fastq)
+        [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
+        # Multiqc is our last step
+        [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
 
 ###############
 ### Download & Build References
@@ -97,7 +110,7 @@ rule mask_reference_fasta:
     input:
         u1af1_exclusion = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True),
         dac_exclusion = HTTPS.remote("encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz", keep_local=True),
-        reference_genome = "{DATA_PATH}/reference/GRCh38.fna"  # Or: rules.get_reference_genome.output
+        reference_genome = ancient(rules.get_reference_genome.output.reference_genome)  # Ancient ignores the mtime: if this file exists, assume we ran.
     output:
         masked_reference_genome = "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna"
     log:
@@ -118,7 +131,7 @@ rule mask_reference_fasta:
 rule bwa_meth_index:
     conda: "envs/env.yaml"
     input:
-        masked_reference_genome = rules.mask_reference_fasta.output
+        masked_reference_genome = ancient(rules.mask_reference_fasta.output)
     output:
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.amb",
@@ -154,6 +167,32 @@ rule md5sum:
         """
         echo -e "{params.r1_checksum}\t{input.r1_file}\n{params.r2_checksum}\t{input.r2_file}" > {output.checksums}
         md5sum --check {output.checksums} > {output.validated}
+        """
+
+### subsample
+# This rule only executes if you do NOT set the subsampled flag -- it generates parallel experiment 
+# directories consisting of subsampled reads to perform rapid analyses.
+rule seqtk_subsample:
+    input:
+        md5_sums = rules.md5sum.output.validated,
+        r1_file = rules.md5sum.input.r1_file,
+        r2_file = rules.md5sum.input.r2_file,
+    output:
+        # We touch these to skip md5 validation on subsampled data
+        touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.known.txt"),
+        touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.validated.txt"),
+        # Actual subsampled reads
+        r1_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R1.fastq.gz",
+        r2_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R2.fastq.gz",
+    params:
+        seed = 4242, # seed required for stable pairs
+        reads = 1000000 # 1 million
+    log:
+        seqtk_err = "{DATA_PATH}/{experiment}/{sample}/logs/seqtk_subsampling.log.txt"
+    shell:
+        """
+        seqtk sample -s {params.seed} {input.r1_file} {params.reads} 2>{log.seqtk_err} | gzip --fast >{output.r1_file_ss}
+        seqtk sample -s {params.seed} {input.r2_file} {params.reads} 2>>{log.seqtk_err} | gzip --fast >{output.r2_file_ss}
         """
 
 
@@ -253,7 +292,7 @@ rule mark_nonconverted:
 
 
 ### fixmate, sort, and markdup
-## These were originally cleanly added as named pipes between snakemake blocks,
+## These were originally defined as named pipes between snakemake blocks,
 ## but I ran into a group bug that I couldn't work around: https://github.com/snakemake/snakemake/issues/1822 
 ## So now we're one large block shell command *shrug*.
 # NOTE: This is the final step in the core alignment pipeline: markdup writes a (lightly) compressed .bam file and index.
@@ -274,7 +313,7 @@ rule samtools_fixmate_sort_markdup:
         # fixmate: -u uncompressed output / -m add mate score tag
         # sort: coodinate sorted, uncompressed sam
         # TODO: Mark supplementary reads of duplicates as duplicates? (-S)
-        # TODO: Specify index name if requred? "-##idx##indexname"
+        # TODO: Specify index name here? Build an idx first? e.g. "-##idx##indexname"
         """
         cat {input} | samtools fixmate -u -m --output-fmt SAM --threads {threads} - - 2>{log.fixmate} | \
         samtools sort --output-fmt SAM --threads {threads} - 2>{log.sort} | \
@@ -296,7 +335,7 @@ rule samtools_index:
     log:
         "{DATA_PATH}/{experiment}/{sample}/logs/samtools-index-bai.log.txt"
     shell:
-        # Note: the markdup makes a .csi index, but we also like .bai's
+        # Note: the markdup makes a .csi index, but more classically like .bai's
         "samtools index -b {input} >{log} 2>&1"
 
 ### samtools statistics
@@ -305,7 +344,7 @@ rule samtools_statistics:
     input:
         bam = rules.samtools_fixmate_sort_markdup.output.bam,
         # Note: we can operate on the .csi index above, but I worry there's a race where
-        # we spawn up idxstats but we only just started writing to a .bai as well
+        # we spawn up idxstats but we only just started writing to a .bai
         index = rules.samtools_index.output
     output:
         flagstat = "{DATA_PATH}/{experiment}/{sample}/samtools/flagstat.txt",
@@ -381,12 +420,14 @@ rule goleft_indexcov:
 rule deeptools_bias_plots:
     conda: "envs/env.yaml"
     input:
-        # rules.samtools_fixmate_sort_markdup.output.bam
+        # bam = rules.samtools_fixmate_sort_markdup.output.bam
     output:
+        # plot = "{DATA_PATH}/{experiment}/{sample}/deeptools/gcbias.png",
+        # stats = "{DATA_PATH}/{experiment}/{sample}/deeptools/gcbias.freq.txt"
     threads: 1
     shell:
-        # TODO: Make the 2bit and compute genome size :/
-        "computeGCBias --verbose --numberOfProcessors {threads} --bamfile file.bam --effectiveGenomeSize XXXXXX --genome make.2bit --biasPlot computeGCBias.png --GCbiasFrequenciesFile freq.txt [options]"
+        # TODO: Make the 2bit and compute genome size :/ -- lots of work for this to function
+        "computeGCBias --verbose --numberOfProcessors {threads} --bamfile {input.bam} --effectiveGenomeSize XXXXXX --genome make.2bit --biasPlot {output.plot} --GCbiasFrequenciesFile {output.stats}"
 
 ### wgbs_tools
 # Generate index
