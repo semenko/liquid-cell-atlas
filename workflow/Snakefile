@@ -14,6 +14,7 @@
 import pathlib
 import glob
 import re
+import sys
 
 import pandas as pd
 from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
@@ -33,10 +34,20 @@ for filename in data_config_files:
     # The experiment "name", which is also the path prefix, e.g. crc / melanoma
     experiment = pathlib.Path(filename).stem
 
+    print(f"Parsing experiment: {experiment}", file=sys.stderr)
+
     # Load the .csv of our sample data
     experiment_df = pd.read_table(filename, delimiter=",").set_index("sample_id", drop=False)
 
-    experiment_df['experiment'] = experiment 
+    experiment_df['experiment'] = experiment
+
+    # If these parameters aren't defined, drop the entry
+    original_length = len(experiment_df)
+    experiment_df.dropna(subset=['experiment', 'sample_id', 'path_R1', 'path_R2', 'method', 'md5sum_R1', 'md5sum_R2'], inplace=True)    
+    new_length = len(experiment_df)
+    
+    if original_length != new_length:
+      print(f"\tWarning: Dropped {original_length-new_length} rows from experiment '{experiment}' that were missing required values.", file=sys.stderr)
 
     # If the subsampled flag is enabled, that means we're *operating* on subsampled data
     # (We're not making it -- it's made on regular / full runs.)
@@ -44,10 +55,10 @@ for filename in data_config_files:
         # So we'll append the _subsampled suffix to experiments
         experiment_df['experiment'] = experiment + "_subsampled"
 
-        # Note that subsampled data all have the same path data, and technically md5 doesn't matter
+        # Note that subsampled data all have the same path data
         experiment_df = experiment_df.assign(path_R1='R1.fastq.gz', path_R2='R2.fastq.gz')
+        # For subsampled reads, we've touch()'d the md5 validation file, so the pipeline will skip it.
         experiment_df = experiment_df.assign(md5sum_R1=None, md5sum_R2=None)
-
 
     # Append to one mega dataframe of all experiments
     all_experiments_df = pd.concat([all_experiments_df, experiment_df])
@@ -61,14 +72,13 @@ ALL_SAMPLES_LIST = []
 
 ## Select just the columns we want.
 # orient=records returns a list of dicts
-# dropna() requires *all* these columns to be defined for each sample
-all_experiments_data = all_experiments_df[['experiment', 'sample_id', 'path_R1', 'path_R2', 'method', 'md5sum_R1', 'md5sum_R2']].dropna().to_dict(orient="records")
+all_experiments_data = all_experiments_df[['experiment', 'sample_id', 'path_R1', 'path_R2', 'method', 'md5sum_R1', 'md5sum_R2']].to_dict(orient="records")
+
+print(f"Parsed {len(all_experiments_data)} total sample files.", file=sys.stderr)
 
 # For building a sample list for Snakemake
 ALL_SAMPLES_LIST.extend(all_experiments_data)
 
-# Remove in prod
-# print(ALL_SAMPLES_LIST)
 
 ###############
 # Snakemake is a little funny.
@@ -78,6 +88,7 @@ rule all:
     input:
         # If you do NOT pass the subsampled flag, then we'll generate subsampled reads (from the full .fastq)
         [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
+        [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R2.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
         # Multiqc is our last step
         [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
 
