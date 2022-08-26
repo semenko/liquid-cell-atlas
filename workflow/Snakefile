@@ -30,6 +30,7 @@ data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
 
+### Parse the sample .csv definitions
 for filename in data_config_files:
     # The experiment "name", which is also the path prefix, e.g. crc / melanoma
     experiment = pathlib.Path(filename).stem
@@ -191,8 +192,8 @@ rule seqtk_subsample:
         r2_file = rules.md5sum.input.r2_file,
     output:
         # We touch these to skip md5 validation on subsampled data
-        touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.known.txt"),
-        touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.validated.txt"),
+        protected(touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.known.txt")),
+        protected(touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.validated.txt")),
         # Actual subsampled reads
         r1_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R1.fastq.gz",
         r2_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R2.fastq.gz",
@@ -214,12 +215,12 @@ rule seqtk_subsample:
 rule fastp:
     conda: "envs/env.yaml"
     input:
-        md5_sums = rules.md5sum.output.validated,
+        md5_sums = ancient(rules.md5sum.output.validated),  # If md5 validation was ever done, skip it.
         r1_file = rules.md5sum.input.r1_file,
         r2_file = rules.md5sum.input.r2_file,
     output:
         fastp_pipe_output = temp(pipe("{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa")),
-        fastp_failed = "{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa",  # Length < 10
+        fastp_failed = "{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa",  # Length < 15
         fastp_json = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.json",
         fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.html"
     log:
@@ -244,7 +245,7 @@ rule fastp:
         trim_r2_5prime = "10",
         trim_r2_3prime = "10",
 
-        minimum_length = 10,
+        minimum_length = 15,
 
         # TruSeq adapters (we could autodetect, but I prefer being explicit)   
         adapter_r1 = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA",
@@ -278,7 +279,7 @@ rule bwa_meth:
         read_group = "@RG\\tID:{sample}\\tSM:{sample}"
     log:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
-    threads: 30
+    threads: 34
     shell:
         "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
 
