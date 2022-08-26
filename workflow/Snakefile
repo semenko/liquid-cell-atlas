@@ -202,10 +202,13 @@ rule seqtk_subsample:
         reads = 1000000 # 1 million
     log:
         seqtk_err = "{DATA_PATH}/{experiment}/{sample}/logs/seqtk_subsampling.log.txt"
+    threads: 8
+    benchmark:
+        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/seqtk_subsampling.txt"
     shell:
         """
-        seqtk sample -s {params.seed} {input.r1_file} {params.reads} 2>{log.seqtk_err} | gzip --fast >{output.r1_file_ss}
-        seqtk sample -s {params.seed} {input.r2_file} {params.reads} 2>>{log.seqtk_err} | gzip --fast >{output.r2_file_ss}
+        seqtk sample -s {params.seed} {input.r1_file} {params.reads} 2>{log.seqtk_err} | pigz --fast --processes {threads} >{output.r1_file_ss}
+        seqtk sample -s {params.seed} {input.r2_file} {params.reads} 2>>{log.seqtk_err} | pigz --fast --processes {threads} >{output.r2_file_ss}
         """
 
 
