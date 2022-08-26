@@ -24,7 +24,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -59,15 +59,16 @@ for filename in data_config_files:
 #   'method': 'emseq', 'md5sum_R1': '4be250532…', 'md5sum_R2': '783e91bd2…'}
 ALL_SAMPLES_LIST = []
 
-# Select just the columns we want.
+## Select just the columns we want.
 # orient=records returns a list of dicts
-all_experiments_data = all_experiments_df[['experiment', 'sample_id', 'path_R1', 'path_R2', 'method', 'md5sum_R1', 'md5sum_R2']].to_dict(orient="records")
+# dropna() requires *all* these columns to be defined for each sample
+all_experiments_data = all_experiments_df[['experiment', 'sample_id', 'path_R1', 'path_R2', 'method', 'md5sum_R1', 'md5sum_R2']].dropna().to_dict(orient="records")
 
 # For building a sample list for Snakemake
 ALL_SAMPLES_LIST.extend(all_experiments_data)
 
 # Remove in prod
-print(ALL_SAMPLES_LIST)
+# print(ALL_SAMPLES_LIST)
 
 ###############
 # Snakemake is a little funny.
