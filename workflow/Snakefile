@@ -199,7 +199,7 @@ rule seqtk_subsample:
         r2_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R2.fastq.gz",
     params:
         seed = 4242, # seed required for stable pairs
-        reads = 1000000 # 1 million
+        reads = 5000000 # 5 million-per pair (10M total)
     log:
         seqtk_err = "{DATA_PATH}/{experiment}/{sample}/logs/seqtk_subsampling.log.txt"
     threads: 8
