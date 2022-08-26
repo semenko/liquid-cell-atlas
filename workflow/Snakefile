@@ -279,7 +279,9 @@ rule bwa_meth:
         read_group = "@RG\\tID:{sample}\\tSM:{sample}"
     log:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
-    threads: 34
+    benchmark:
+        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/bwameth.txt"
+    threads: 40
     shell:
         "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
 
@@ -320,6 +322,8 @@ rule samtools_fixmate_sort_markdup:
         fixmate = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt",
         sort = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt",
         markdup = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-markdup.log.txt"
+    benchmark:
+        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/samtools.txt"
     threads: 1
     shell:
         # fixmate is needed for markdup -- it adds ms and MC tags
