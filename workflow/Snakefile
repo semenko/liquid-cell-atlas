@@ -191,12 +191,12 @@ rule seqtk_subsample:
         r1_file = rules.md5sum.input.r1_file,
         r2_file = rules.md5sum.input.r2_file,
     output:
-        # We touch these to skip md5 validation on subsampled data
-        protected(touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.known.txt")),
-        protected(touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.validated.txt")),
         # Actual subsampled reads
         r1_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R1.fastq.gz",
         r2_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R2.fastq.gz",
+        # We touch these to skip md5 validation on subsampled data
+        md5_known = touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.known.txt"),
+        md5_validated = touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.validated.txt"),
     params:
         seed = 4242, # seed required for stable pairs
         reads = 5000000 # 5 million-per pair (10M total)
