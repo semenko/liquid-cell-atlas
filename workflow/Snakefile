@@ -502,4 +502,4 @@ rule multiqc:
     log:
         "{DATA_PATH}/{experiment}/{sample}/logs/multiqc.log.txt"
     shell:
-        "multiqc --outdir {params.out_dir} --force --verbose --exclude snippy {params.in_dir} >{log} 2>&1"
+        "multiqc --outdir {params.out_dir} --force --verbose --interactive --exclude snippy {params.in_dir} >{log} 2>&1"
