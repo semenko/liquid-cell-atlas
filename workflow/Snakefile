@@ -166,6 +166,7 @@ rule bwa_meth_index:
 
 ### md5
 # Validate checksums
+# This should NOT run on subsampled files
 rule md5sum:
     input:
         r1_file = lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/" + all_experiments_df.loc[wildcards.sample, 'path_R1'],
@@ -218,7 +219,7 @@ rule seqtk_subsample:
 rule fastp:
     conda: "envs/env.yaml"
     input:
-        md5_sums = ancient(rules.md5sum.output.validated),  # If md5 validation was ever done, skip it.
+        md5_sums = ancient(rules.md5sum.output.validated),
         r1_file = rules.md5sum.input.r1_file,
         r2_file = rules.md5sum.input.r2_file,
     output:
