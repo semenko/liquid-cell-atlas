@@ -25,7 +25,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+# data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
