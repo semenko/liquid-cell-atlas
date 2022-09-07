@@ -25,7 +25,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-# data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/spikeCRCv2.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -225,8 +225,8 @@ rule fastp:
     output:
         fastp_pipe_output = temp(pipe("{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa")),
         fastp_failed = "{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa",  # Length < 15
-        fastp_json = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.json",
-        fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/fastp.html"
+        fastp_json = "{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.json",
+        fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.html"
     log:
         fastp_err = "{DATA_PATH}/{experiment}/{sample}/logs/fastp.log.txt"
     threads: 1  # One thread is never rate-limiting here
@@ -320,8 +320,8 @@ rule samtools_fixmate_sort_markdup:
     input:
         rules.mark_nonconverted.output
     output:
-        bam = protected("{DATA_PATH}/{experiment}/{sample}/aligned.bam"),
-        stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/markdup.txt"
+        bam = protected("{DATA_PATH}/{experiment}/{sample}/{sample}.bam"),
+        stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.markdup.txt"
     log:
         fixmate = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt",
         sort = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt",
@@ -352,7 +352,7 @@ rule samtools_index:
     input:
         rules.samtools_fixmate_sort_markdup.output.bam
     output:
-        "{DATA_PATH}/{experiment}/{sample}/aligned.bam.bai"
+        "{DATA_PATH}/{experiment}/{sample}/{sample}.bam.bai"
     log:
         "{DATA_PATH}/{experiment}/{sample}/logs/samtools-index-bai.log.txt"
     shell:
@@ -368,9 +368,9 @@ rule samtools_statistics:
         # we spawn up idxstats but we only just started writing to a .bai
         index = rules.samtools_index.output
     output:
-        flagstat = "{DATA_PATH}/{experiment}/{sample}/samtools/flagstat.txt",
-        idxstats = "{DATA_PATH}/{experiment}/{sample}/samtools/idxstats.txt",
-        stats = "{DATA_PATH}/{experiment}/{sample}/samtools/stats.txt",
+        flagstat = "{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.flagstat.txt",
+        idxstats = "{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.idxstats.txt",
+        stats = "{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.stats.txt",
     log:
         flagstat = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-flagstat.log.txt",
         idxstats = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-idxstats.log.txt",
@@ -407,7 +407,7 @@ rule fastqc_bam:
     input:
         rules.samtools_fixmate_sort_markdup.output.bam
     output:
-        "{DATA_PATH}/{experiment}/{sample}/fastqc/aligned_fastqc.html"
+        "{DATA_PATH}/{experiment}/{sample}/fastqc/{sample}_fastqc.html"
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/fastqc/",
     log:
