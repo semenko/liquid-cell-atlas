@@ -26,7 +26,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -173,8 +173,9 @@ rule md5sum:
         r1_file = lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/" + all_experiments_df.loc[wildcards.sample, 'path_R1'],
         r2_file = lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/" + all_experiments_df.loc[wildcards.sample, 'path_R2'],
     output:
-        checksums = "{DATA_PATH}/{experiment}/{sample}/logs/md5.known.txt",
-        validated = "{DATA_PATH}/{experiment}/{sample}/logs/md5.validated.txt"
+        # We keep these in the raw directory to make it easier to reset/remove runs (rm everything except raw/)
+        checksums = "{DATA_PATH}/{experiment}/{sample}/raw/md5.known.txt",
+        validated = "{DATA_PATH}/{experiment}/{sample}/raw/md5.validated.txt"
     params:
         r1_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R1'],
         r2_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R2']
@@ -197,8 +198,8 @@ rule seqtk_subsample:
         r1_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R1.fastq.gz",
         r2_file_ss = "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R2.fastq.gz",
         # We touch these to skip md5 validation on subsampled data
-        md5_known = touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.known.txt"),
-        md5_validated = touch("{DATA_PATH}/{experiment}_subsampled/{sample}/logs/md5.validated.txt"),
+        md5_known = touch("{DATA_PATH}/{experiment}_subsampled/{sample}/raw/md5.known.txt"),
+        md5_validated = touch("{DATA_PATH}/{experiment}_subsampled/{sample}/raw/md5.validated.txt"),
     params:
         seed = 4242, # seed required for stable pairs
         reads = 5000000 # 5 million-per pair (10M total)
@@ -493,9 +494,9 @@ rule wgbs_tools_pat_beta:
         "wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
 
 ### multiqc
-# Aggregate all our pretty data
+# This runs just multiqc per-sample (is this useful?)
 # Note: This pan-dependency ensures all other jobs are run.
-rule multiqc:
+rule multiqc_each:
     conda: "envs/env.yaml"
     input:
         rules.samtools_statistics.output,
@@ -511,5 +512,27 @@ rule multiqc:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/multiqc/"
     log:
         "{DATA_PATH}/{experiment}/{sample}/logs/multiqc.log.txt"
+    shell:
+        "multiqc --outdir {params.out_dir} --force --verbose --interactive --exclude snippy {params.in_dir} >{log} 2>&1"
+
+### multiqc by project
+# Run a massive multi-qc for each project
+# Note: This pan-dependency ensures all other jobs are run.
+rule multiqc:
+    conda: "envs/env.yaml"
+    input:
+        rules.samtools_statistics.output,
+        rules.fastqc_bam.output,
+        rules.methyldackel_mbias_plots.output,
+        rules.goleft_indexcov.output
+        # rules.wgbs_tools_pat_beta.output,
+        # rules.deeptools_bias_plots.output
+    output:
+        "{DATA_PATH}/{experiment}/multiqc/multiqc_report.html"
+    params:
+        in_dir = "{DATA_PATH}/{experiment}//",
+        out_dir = "{DATA_PATH}/{experiment}/multiqc/"
+    log:
+        "{DATA_PATH}/{experiment}/multiqc.log.txt"
     shell:
         "multiqc --outdir {params.out_dir} --force --verbose --interactive --exclude snippy {params.in_dir} >{log} 2>&1"
