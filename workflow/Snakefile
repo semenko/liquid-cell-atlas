@@ -89,10 +89,11 @@ ALL_SAMPLES_LIST.extend(all_experiments_data)
 rule all:
     input:
         # If you do NOT pass the subsampled flag, then we'll generate subsampled reads (from the full .fastq)
-        [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
-        [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R2.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
-        # Multiqc is our last step
-        [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
+        r1ss = [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
+        r2ss = [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R2.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
+        # Multiqc is our ~last step
+        multiqc = [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
+        expt_multiqc =[f"{DATA_PATH}/{sample['experiment']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
 
 ###############
 ### Download & Build References
@@ -521,18 +522,13 @@ rule multiqc_each:
 rule multiqc:
     conda: "envs/env.yaml"
     input:
-        rules.samtools_statistics.output,
-        rules.fastqc_bam.output,
-        rules.methyldackel_mbias_plots.output,
-        rules.goleft_indexcov.output
-        # rules.wgbs_tools_pat_beta.output,
-        # rules.deeptools_bias_plots.output
+         rules.all.input.multiqc
     output:
         "{DATA_PATH}/{experiment}/multiqc/multiqc_report.html"
     params:
-        in_dir = "{DATA_PATH}/{experiment}//",
-        out_dir = "{DATA_PATH}/{experiment}/multiqc/"
+        in_dir = "{DATA_PATH}/{experiment}/",
+        out_dir = "{DATA_PATH}/{experiment}/multiqc/",
     log:
-        "{DATA_PATH}/{experiment}/multiqc.log.txt"
+        "{DATA_PATH}/{experiment}/multiqc/log.txt"
     shell:
         "multiqc --outdir {params.out_dir} --force --verbose --interactive --exclude snippy {params.in_dir} >{log} 2>&1"
