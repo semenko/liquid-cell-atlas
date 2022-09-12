@@ -26,7 +26,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -179,11 +179,12 @@ rule md5sum:
         validated = "{DATA_PATH}/{experiment}/{sample}/raw/md5.validated.txt"
     params:
         r1_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R1'],
-        r2_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R2']
+        r2_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R2'],
+        subsampled = "subsampled" in config
     shell:
         """
         echo -e "{params.r1_checksum}\t{input.r1_file}\n{params.r2_checksum}\t{input.r2_file}" > {output.checksums}
-        md5sum --check {output.checksums} > {output.validated}
+        ( [ "{params.subsampled}" = "True" ] && touch {output.validated}) || md5sum --check {output.checksums} > {output.validated}
         """
 
 ### subsample
