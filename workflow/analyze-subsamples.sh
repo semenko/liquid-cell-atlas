@@ -9,3 +9,8 @@ snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --keep-goi
 # Next, run the subsampled analyses
 # This runs the entire analysis pipeline, exclusively on _subsampled data
 snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --keep-going --rerun-triggers mtime --config subsampled=True
+
+# Run only md5sum -- runs once, very IO intensive:
+#  snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --keep-going --rerun-triggers mtime --until md5sum
+# Run on everything:
+#  snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --keep-going --rerun-triggers mtime --config

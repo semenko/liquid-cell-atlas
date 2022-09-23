@@ -110,7 +110,7 @@ HTTPS = HTTPRemoteProvider()
 rule get_reference_genome:
     input:
         # Not really ftp -- it's HTTPS/TLS
-        reference_genome = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz", keep_local=True)
+        reference_genome = ancient(HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz", keep_local=True))
     output:
         reference_genome = "{DATA_PATH}/reference/GRCh38.fna"
     run:
@@ -123,8 +123,8 @@ rule mask_reference_fasta:
     # TODO: Consider a more modular env definition? (one per rule / rule group?)
     conda: "envs/env.yaml"
     input:
-        u1af1_exclusion = HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True),
-        dac_exclusion = HTTPS.remote("encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz", keep_local=True),
+        u1af1_exclusion = ancient(HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True)),
+        dac_exclusion = ancient(HTTPS.remote("encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz", keep_local=True)),
         reference_genome = ancient(rules.get_reference_genome.output.reference_genome)  # Ancient ignores the mtime: if this file exists, assume we ran.
     output:
         masked_reference_genome = "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna"
@@ -181,6 +181,7 @@ rule md5sum:
         r1_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R1'],
         r2_checksum = lambda wildcards: all_experiments_df.loc[wildcards.sample, 'md5sum_R2'],
         subsampled = "subsampled" in config
+    threads: 25   # Bit of a hack: this is IO bound, try to throttle it a bit
     shell:
         """
         echo -e "{params.r1_checksum}\t{input.r1_file}\n{params.r2_checksum}\t{input.r2_file}" > {output.checksums}
