@@ -193,7 +193,7 @@ rule md5sum:
 # directories consisting of subsampled reads to perform rapid analyses.
 rule seqtk_subsample:
     input:
-        md5_sums = rules.md5sum.output.validated,
+        md5_sums = ancient(rules.md5sum.output.validated),
         r1_file = rules.md5sum.input.r1_file,
         r2_file = rules.md5sum.input.r2_file,
     output:
