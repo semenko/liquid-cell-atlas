@@ -23,7 +23,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -192,6 +192,7 @@ rule md5sum:
 # This rule only executes if you do NOT set the subsampled flag -- it generates parallel experiment 
 # directories consisting of subsampled reads to perform rapid analyses.
 rule seqtk_subsample:
+    conda: "envs/env.yaml"
     input:
         md5_sums = ancient(rules.md5sum.output.validated),
         r1_file = rules.md5sum.input.r1_file,
@@ -341,7 +342,7 @@ rule samtools_fixmate_sort_markdup:
         markdup = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-markdup.log.txt"
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/samtools.txt"
-    threads: 1
+    threads: 4
     shell:
         # fixmate is needed for markdup -- it adds ms and MC tags
         # fixmate: -u uncompressed output / -m add mate score tag
