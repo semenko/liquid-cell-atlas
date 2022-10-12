@@ -23,7 +23,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -240,8 +240,8 @@ rule fastp:
     output:
         fastp_pipe_output = temp(pipe("{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa")),
         fastp_failed = "{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa",  # Length < 15
-        fastp_json = "{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.json",
-        fastp_html = "{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.html"
+        fastp_json = ensure("{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.json", non_empty=True),
+        fastp_html = ensure("{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.html", non_empty=True)
     log:
         fastp_err = "{DATA_PATH}/{experiment}/{sample}/logs/fastp.log.txt"
     threads: 1  # One thread is never rate-limiting here
@@ -335,7 +335,7 @@ rule samtools_fixmate_sort_markdup:
         rules.mark_nonconverted.output
     output:
         bam = protected("{DATA_PATH}/{experiment}/{sample}/{sample}.bam"),
-        stats_file = "{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.markdup.txt"
+        stats_file = ensure("{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.markdup.txt", non_empty=True)
     log:
         fixmate = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt",
         sort = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt",
