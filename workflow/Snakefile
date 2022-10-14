@@ -27,7 +27,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Uncomment for test runs
-# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -165,14 +165,11 @@ rule bwa_meth_index:
 ###############
 
 rule git_submodule_init:
-    input:
-        ancient(get_reference_genome.output.reference_genome) # Not really used.
     output:
         "mark-nonconverted-reads/.git",
         "wgbs_tools/.git"
     shell:
         "git submodule update --init --recursive"
-
 
 ###############
 ### Core Pipeline Steps
@@ -311,7 +308,7 @@ rule bwa_meth:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/bwameth.txt"
-    threads: os.sched_getaffinity(0)
+    threads: lambda x: len(os.sched_getaffinity(0))
     shell:
         "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
 
@@ -485,23 +482,18 @@ rule wgbs_build:
     input:
         git_submodule_init = rules.git_submodule_init.output
     output:
-        "wgbs_tools/references/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
+        "wgbs_tools/src/python/wgbs_tools.py"
     log:
-        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/build.log.txt"
+        "wgbs_tools/snakemake_build.log.txt"
     shell:
-        """
-        cd wgbs_tools
-        python setup.py >{log} 2>&1
-        """
-
+        "cd wgbs_tools && python setup.py >{log} 2>&1"
 
 # Generate index
 rule wgbs_tools_index:
     conda: "envs/env.yaml"
     input:
-        reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
         wgbs_build = rules.wgbs_build.output,
-        git_submodule_init = rules.git_submodule_init.output
+        # reference = rules.mask_reference_fasta.output.masked_reference_genome   # This causes a cyclic dep??
     output:
         "wgbs_tools/references/GRCh38-DAC-U2AF1/chrome.size",
         "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.bed.gz",
@@ -509,11 +501,9 @@ rule wgbs_tools_index:
         "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.chrome.size",
         "wgbs_tools/references/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
     log:
-        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/init_genome.log.txt"
+        "wgbs_tools/references/snakemake_init_genome.log.txt"
     shell:
-        """
-        ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference_genome} >{log} 2>&1
-        """
+        "./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} >{log} 2>&1"
 
 ### WGBS pat/beta file formats
 rule wgbs_tools_pat_beta:
@@ -532,7 +522,7 @@ rule wgbs_tools_pat_beta:
     threads: 1
     shell:
         # TODO: Fix this path
-        "wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
+        "./wgbs_tools/wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
 
 ### multiqc
 # This runs just multiqc per-sample (is this useful?)
@@ -543,8 +533,8 @@ rule multiqc_each:
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
         rules.methyldackel_mbias_plots.output,
-        rules.goleft_indexcov.output
-        # rules.wgbs_tools_pat_beta.output,
+        rules.goleft_indexcov.output,
+        rules.wgbs_tools_pat_beta.output
         # rules.deeptools_bias_plots.output
     output:
         "{DATA_PATH}/{experiment}/{sample}/multiqc/multiqc_report.html"
