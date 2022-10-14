@@ -147,7 +147,7 @@ rule mask_reference_fasta:
 rule bwa_meth_index:
     conda: "envs/env.yaml"
     input:
-        masked_reference_genome = ancient(rules.mask_reference_fasta.output)
+        masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.amb",
@@ -493,17 +493,22 @@ rule wgbs_tools_index:
     conda: "envs/env.yaml"
     input:
         wgbs_build = rules.wgbs_build.output,
-        # reference = rules.mask_reference_fasta.output.masked_reference_genome   # This causes a cyclic dep??
+        reference = rules.mask_reference_fasta.output.masked_reference_genome
     output:
-        "wgbs_tools/references/GRCh38-DAC-U2AF1/chrome.size",
-        "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.bed.gz",
-        "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.bed.gz.csi",
-        "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.chrome.size",
-        "wgbs_tools/references/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
+        # NOTE: This is a bit of a hack to avoid cyclic dependencies -- we specify {DATA_PATH} in the output
+        # and symlink the actual references path to our data dir.
+        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/chrome.size",
+        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz",
+        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz.csi",
+        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/CpG.chrome.size",
+        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
     log:
-        "wgbs_tools/references/snakemake_init_genome.log.txt"
+        "{DATA_PATH}/references/wgbs_tools/snakemake_init_genome.log.txt"
     shell:
-        "./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} >{log} 2>&1"
+        """
+        ln -s {DATA_PATH}/references/wgbs_tools/ ./wgbs_tools/references
+        ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} >{log} 2>&1
+        """
 
 ### WGBS pat/beta file formats
 rule wgbs_tools_pat_beta:
