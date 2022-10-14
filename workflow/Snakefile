@@ -161,6 +161,17 @@ rule bwa_meth_index:
         "bwameth.py index {input.masked_reference_genome} >{log.index} 2>&1"
 
 ###############
+## Pull our git submodules at least once
+###############
+
+rule git_submodule_init:
+    input:
+        ancient(get_reference_genome.output.reference_genome) # Not really used.
+    output:
+        "mark-nonconverted-reads/.git",
+        "wgbs_tools/.git"
+    shell:
+        "git submodule update --init --recursive"
 
 
 ###############
@@ -314,7 +325,8 @@ rule mark_nonconverted:
     conda: "envs/env.yaml"
     input:
         aligned_sam = "{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam",
-        reference_genome = rules.mask_reference_fasta.output.masked_reference_genome
+        reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
+        git_submodule_init = rules.git_submodule_init.output
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/nonconv-marked.sam"))
     log:
@@ -466,25 +478,49 @@ rule deeptools_bias_plots:
         "computeGCBias --verbose --numberOfProcessors {threads} --bamfile {input.bam} --effectiveGenomeSize XXXXXX --genome make.2bit --biasPlot {output.plot} --GCbiasFrequenciesFile {output.stats}"
 
 ### wgbs_tools
+# Build wgbs_tools, requires libboost
+# Bit of a hackjob to build this here...
+rule wgbs_build:
+    conda: "envs/env.yaml"
+    input:
+        git_submodule_init = rules.git_submodule_init.output
+    output:
+        "wgbs_tools/references/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
+    log:
+        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/build.log.txt"
+    shell:
+        """
+        cd wgbs_tools
+        python setup.py >{log} 2>&1
+        """
+
+
 # Generate index
 rule wgbs_tools_index:
     conda: "envs/env.yaml"
     input:
-        rules.mask_reference_fasta.output.masked_reference_genome
+        reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
+        wgbs_build = rules.wgbs_build.output,
+        git_submodule_init = rules.git_submodule_init.output
     output:
-        # TODO: where's the output?
+        "wgbs_tools/references/GRCh38-DAC-U2AF1/chrome.size",
+        "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.bed.gz",
+        "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.bed.gz.csi",
+        "wgbs_tools/references/GRCh38-DAC-U2AF1/CpG.chrome.size",
+        "wgbs_tools/references/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
     log:
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/init_genome.log.txt"
     shell:
-        # TODO: Fix this path
-        "wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input} >{log} 2>&1"
+        """
+        ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference_genome} >{log} 2>&1
+        """
 
 ### WGBS pat/beta file formats
 rule wgbs_tools_pat_beta:
     conda: "envs/env.yaml"
     input:
         bam = rules.samtools_fixmate_sort_markdup.output.bam,
-        index = rules.wgbs_tools_index.output
+        index = rules.wgbs_tools_index.output,
     output:
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.pat.gz",
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.beta"
