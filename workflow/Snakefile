@@ -11,6 +11,7 @@
 # Snakepipes WGBS pipeline: https://snakepipes.readthedocs.io/en/latest/content/workflows/WGBS.html
 # Snakemake Wrappers: https://github.com/snakemake/snakemake-wrappers/
 
+import os
 import pathlib
 import glob
 import gzip
@@ -299,7 +300,7 @@ rule bwa_meth:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/bwameth.txt"
-    threads: 40
+    threads: os.sched_getaffinity(0)
     shell:
         "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
 
