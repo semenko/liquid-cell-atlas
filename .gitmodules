@@ -1,3 +1,6 @@
 [submodule "workflow/mark-nonconverted-reads"]
 	path = workflow/mark-nonconverted-reads
 	url = https://github.com/nebiolabs/mark-nonconverted-reads
+[submodule "workflow/wgbs_tools"]
+	path = workflow/wgbs_tools
+	url = https://github.com/nloyfer/wgbs_tools
