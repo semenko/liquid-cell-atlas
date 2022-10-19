@@ -498,16 +498,16 @@ rule wgbs_tools_index:
     output:
         # NOTE: This is a bit of a hack to avoid cyclic dependencies -- we specify {DATA_PATH} in the output
         # and symlink the actual references path to our data dir.
-        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/chrome.size",
-        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz",
-        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz.csi",
-        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/CpG.chrome.size",
-        "{DATA_PATH}/references/wgbs_tools/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
+        "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/chrome.size",
+        "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz",
+        "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz.csi",
+        "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/CpG.chrome.size",
+        "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/rev.CpG.bed.gz.tbi"
     log:
-        "{DATA_PATH}/references/wgbs_tools/snakemake_init_genome.log.txt"
+        "{DATA_PATH}/reference/wgbs_tools/snakemake_init_genome.log.txt"
     shell:
         """
-        ln -s ../{DATA_PATH}/references/wgbs_tools/ ./wgbs_tools/references
+        ln -s ../{DATA_PATH}/reference/wgbs_tools/ ./wgbs_tools/references
         ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} >{log} 2>&1
         """
 
