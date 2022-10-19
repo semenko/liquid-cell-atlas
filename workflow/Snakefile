@@ -21,13 +21,14 @@ import sys
 import pandas as pd
 from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 
+# Must be relative for symlink in wgbs_tools (!)
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -323,7 +324,7 @@ rule mark_nonconverted:
     input:
         aligned_sam = "{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
-        git_submodule_init = rules.git_submodule_init.output
+        git_submodule_init = ancient(rules.git_submodule_init.output)
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/nonconv-marked.sam"))
     log:
@@ -480,7 +481,7 @@ rule deeptools_bias_plots:
 rule wgbs_build:
     conda: "envs/env.yaml"
     input:
-        git_submodule_init = rules.git_submodule_init.output
+        git_submodule_init = ancient(rules.git_submodule_init.output)
     output:
         "wgbs_tools/src/python/wgbs_tools.py"
     log:
@@ -506,7 +507,7 @@ rule wgbs_tools_index:
         "{DATA_PATH}/references/wgbs_tools/snakemake_init_genome.log.txt"
     shell:
         """
-        ln -s {DATA_PATH}/references/wgbs_tools/ ./wgbs_tools/references
+        ln -s ../{DATA_PATH}/references/wgbs_tools/ ./wgbs_tools/references
         ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} >{log} 2>&1
         """
 
