@@ -4,3 +4,4 @@
 [submodule "workflow/wgbs_tools"]
 	path = workflow/wgbs_tools
 	url = https://github.com/nloyfer/wgbs_tools
+	ignore = untracked
