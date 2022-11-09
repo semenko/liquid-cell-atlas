@@ -93,8 +93,9 @@ rule all:
         # If you do NOT pass the subsampled flag, then we'll generate subsampled reads (from the full .fastq)
         r1ss = [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
         r2ss = [f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R2.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
-        # Multiqc is our ~last step
-        multiqc = [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
+        # Each sub-job has a dependency logged here as
+        multiqc = [f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.pipeline-complete" for sample in ALL_SAMPLES_LIST],
+        # Run multiqc per-experiment as our ~last step
         expt_multiqc =[f"{DATA_PATH}/{sample['experiment']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
 
 ###############
@@ -498,6 +499,7 @@ rule wgbs_tools_index:
     output:
         # NOTE: This is a bit of a hack to avoid cyclic dependencies -- we specify {DATA_PATH} in the output
         # and symlink the actual references path to our data dir.
+        # TODO: Remove this? No longer needed?
         "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/chrome.size",
         "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz",
         "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz.csi",
@@ -530,10 +532,9 @@ rule wgbs_tools_pat_beta:
         # TODO: Fix this path
         "./wgbs_tools/wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
 
-### multiqc
-# This runs just multiqc per-sample (is this useful?)
+### Run Aggregator
 # Note: This pan-dependency ensures all other jobs are run.
-rule multiqc_each:
+rule touch_complete_flag:
     conda: "envs/env.yaml"
     input:
         rules.samtools_statistics.output,
@@ -543,18 +544,14 @@ rule multiqc_each:
         rules.wgbs_tools_pat_beta.output
         # rules.deeptools_bias_plots.output
     output:
-        "{DATA_PATH}/{experiment}/{sample}/multiqc/multiqc_report.html"
+        "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete"
     params:
-        in_dir = "{DATA_PATH}/{experiment}/{sample}/",
-        out_dir = "{DATA_PATH}/{experiment}/{sample}/multiqc/"
-    log:
-        "{DATA_PATH}/{experiment}/{sample}/logs/multiqc.log.txt"
+        out_flag= "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete"
     shell:
-        "multiqc --outdir {params.out_dir} --force --verbose --interactive --exclude snippy {params.in_dir} >{log} 2>&1"
+        "touch {params.out_flag}"
 
-### multiqc by project
-# Run a massive multi-qc for each project
-# Note: This pan-dependency ensures all other jobs are run.
+### multiqc
+# Across an entire experiment/project, not per-sample or batch
 rule multiqc:
     conda: "envs/env.yaml"
     input:
