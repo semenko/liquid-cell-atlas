@@ -14,3 +14,6 @@ snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --keep-goi
 #  snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --keep-going --rerun-triggers mtime --until md5sum
 # Run on everything:
 #  snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --keep-going --rerun-triggers mtime --config
+
+# NOTE: If you need, you can specify a temp directory, e.g. with:
+# snakemake --cores 100 --use-conda --printshellcmds --rerun-incomplete --rerun-triggers mtime --keep-going --default-resources "tmpdir='/scratch-raid0/tmp/'"
