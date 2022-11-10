@@ -497,9 +497,6 @@ rule wgbs_tools_index:
         wgbs_build = rules.wgbs_build.output,
         reference = rules.mask_reference_fasta.output.masked_reference_genome
     output:
-        # NOTE: This is a bit of a hack to avoid cyclic dependencies -- we specify {DATA_PATH} in the output
-        # and symlink the actual references path to our data dir.
-        # TODO: Remove this? No longer needed?
         "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/chrome.size",
         "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz",
         "{DATA_PATH}/reference/wgbs_tools/GRCh38-DAC-U2AF1/CpG.bed.gz.csi",
@@ -508,9 +505,11 @@ rule wgbs_tools_index:
     log:
         "{DATA_PATH}/reference/wgbs_tools/snakemake_init_genome.log.txt"
     shell:
+        # NOTE: The -f force in init_genome seems to be required for wgbs_tools to build in a symlinked directory,
+        # otherwise it seems to think the index already exists (when it doesn't).
         """
         ln -s ../{DATA_PATH}/reference/wgbs_tools/ ./wgbs_tools/references
-        ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} >{log} 2>&1
+        ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} -f >{log} 2>&1
         """
 
 ### WGBS pat/beta file formats
@@ -529,7 +528,6 @@ rule wgbs_tools_pat_beta:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/"
     threads: 1
     shell:
-        # TODO: Fix this path
         "./wgbs_tools/wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
 
 ### Run Aggregator
