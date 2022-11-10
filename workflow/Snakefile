@@ -519,9 +519,11 @@ rule wgbs_tools_pat_beta:
         bam = rules.samtools_fixmate_sort_markdup.output.bam,
         index = rules.wgbs_tools_index.output,
     output:
-        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.pat.gz",
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.beta"
-        # TODO: What's the mbias output?
+        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.pat.gz",
+        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.pat.gz.csi",
+        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.mbias/{sample}.mbias.OB.txt",
+        "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.mbias/{sample}.mbias.OT.txt"
     log:
         "{DATA_PATH}/{experiment}/{sample}/logs/wgbs_tools-bam2pat.log.txt"
     params:
@@ -563,3 +565,11 @@ rule multiqc:
         "{DATA_PATH}/{experiment}/multiqc/log.txt"
     shell:
         "multiqc --outdir {params.out_dir} --force --verbose --interactive --exclude snippy {params.in_dir} >{log} 2>&1"
+
+
+# nfty.sh push for the whole job
+onsuccess:
+    shell('curl -d "Job Complete on $HOSTNAME" ntfy.sh/semenko-snakemake')
+
+onerror:
+    shell('curl -d "ERROR on $HOSTNAME" ntfy.sh/semenko-snakemake')
