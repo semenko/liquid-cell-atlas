@@ -25,7 +25,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -505,6 +505,8 @@ rule wgbs_tools_index:
     shell:
         # NOTE: The -f force in init_genome seems to be required for wgbs_tools to build in a symlinked directory,
         # otherwise it seems to think the index already exists (when it doesn't).
+        # NOTE: Consider just run the ln -s if path exists, otherwise this gets re-build on other nodes if there are multiple running nodes
+        # and a shared resource directory?
         """
         ln -s ../{DATA_PATH}/reference/wgbs_tools/ ./wgbs_tools/references
         ./wgbs_tools/wgbstools init_genome GRCh38-DAC-U2AF1 --fasta_path {input.reference} -f >{log} 2>&1
