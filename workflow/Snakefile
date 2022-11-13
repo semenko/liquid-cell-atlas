@@ -144,23 +144,23 @@ rule mask_reference_fasta:
         bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed >>{log.maskfasta} 2>&1
         """
 
-### bwa meth index
-# This should run once to generate indices for bwa mem (through bwa-meth)
+### bwa-meth index
+# This should run once to generate indices for bwa-mem2 (through bwa-meth)
 rule bwa_meth_index:
     conda: "envs/env.yaml"
     input:
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.0123",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.amb",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.ann",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.bwt",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.pac",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.sa",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.bwt.2bit.64",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.pac"
     log:
-        index = "{DATA_PATH}/reference/bwameth_index.log.txt"
+        index = "{DATA_PATH}/reference/bwameth_bwa-mem2-index.log.txt"
     shell:
-        "bwameth.py index {input.masked_reference_genome} >{log.index} 2>&1"
+        "bwameth.py index-mem2 {input.masked_reference_genome} >{log.index} 2>&1"
 
 ###############
 ## Pull our git submodules at least once
@@ -292,15 +292,13 @@ rule fastp:
         """
 
 ### bwa_meth
-# This uses bwa mem, instead of bwa-mem2
-# NOTE: You could also run bwa mem2. I don't here because of a compile-time bug:
-# see https://github.com/bwa-mem2/bwa-mem2/issues/207
+# This uses bwa-mem2
 rule bwa_meth:
     conda: "envs/env.yaml"
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
-        bwa_meth_indices = rules.bwa_meth_index.output
+        bwa_meth_indices = ancient(rules.bwa_meth_index.output)  # We assume ancient, to not force re-run of bwa mem vs bwa-mem2
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam"))
     params:
