@@ -547,7 +547,10 @@ rule touch_complete_flag:
     params:
         out_flag= "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete"
     shell:
-        "touch {params.out_flag}"
+        """
+        touch {params.out_flag}
+        curl -H "Priority: low" -d "$HOSTNAME: {experiment}/{sample}" ntfy.sh/semenko-snakemake
+        """
 
 ### multiqc
 # Across an entire experiment/project, not per-sample or batch
@@ -568,7 +571,8 @@ rule multiqc:
 
 # nfty.sh push for the whole job
 onsuccess:
-    shell('curl -d "Job Complete on $HOSTNAME" ntfy.sh/semenko-snakemake')
+    shell('curl -H "Title: Success" -H "Tags: tada" -d "Job complete on $HOSTNAME" ntfy.sh/semenko-snakemake')
 
 onerror:
-    shell('curl -d "ERROR on $HOSTNAME" ntfy.sh/semenko-snakemake')
+    shell('curl -H "Title: Failure" -H "Tags: warning" -d "Job failure on $HOSTNAME" ntfy.sh/semenko-snakemake')
+
