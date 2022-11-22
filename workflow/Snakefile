@@ -25,7 +25,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -51,7 +51,7 @@ for filename in data_config_files:
     new_length = len(experiment_df)
     
     if original_length != new_length:
-      print(f"\tWarning: Dropped {original_length-new_length} rows from experiment '{experiment}' that were missing required values.", file=sys.stderr)
+      print(f"\tWarning: Ignoring {original_length-new_length} samples from experiment '{experiment}' that are missing required values.", file=sys.stderr)
 
     # If the subsampled flag is enabled, that means we're *operating* on subsampled data
     # (We're not making it -- it's made on regular / full runs.)
@@ -146,6 +146,7 @@ rule mask_reference_fasta:
 
 ### bwa-meth index
 # This should run once to generate indices for bwa-mem2 (through bwa-meth)
+# NOTE: We could try bwa-mem2-lisa at some point, but it's very fragile
 rule bwa_meth_index:
     conda: "envs/env.yaml"
     input:
@@ -242,6 +243,7 @@ def trim_poly_g(input):
 # We adapter trimming and poly-g filtering, but leave quality filtering / polyN filtering for later.
 # NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
 rule fastp:
+    group: "bwa_core"
     conda: "envs/env.yaml"
     input:
         md5_sums = ancient(rules.md5sum.output.validated),
@@ -293,6 +295,7 @@ rule fastp:
 ### bwa_meth
 # This uses bwa-mem2
 rule bwa_meth:
+    group: "bwa_core"
     conda: "envs/env.yaml"
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
@@ -318,19 +321,25 @@ rule bwa_meth:
 # This sets XX:Z:UC (the X? Y? and Z? fields of SAM/BAM are user-reserved). We do *not* set the Vendor Failed bit.
 # Note that  MethylDackel can independently identify poor conversion (set minConversionEfficiency).
 rule mark_nonconverted:
+    group: "bwa_core"
     conda: "envs/env.yaml"
     input:
         aligned_sam = "{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
-        git_submodule_init = ancient(rules.git_submodule_init.output)
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/nonconv-marked.sam"))
     log:
         nonconverted = "{DATA_PATH}/{experiment}/{sample}/logs/mark-nonconverted.log.txt"
     params:
-        threshold = 3 # If 3 nonconverted Cs on a read, consider it nonconverted
+        threshold = 3, # If 3 nonconverted Cs on a read, consider it nonconverted
+        # NOTE: We spew lots of warnings from samtools, specifically: [W::sam_parse1] unrecognized reference name ""; treated as unmapped
+        # This string will be filtered from our log file.
+        # TODO: Further investigate this warning
+        ignore_string = "[W::sam_parse1] unrecognized reference name "
     shell:
-        "cat {input.aligned_sam} | mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>{log.nonconverted} >{output}"
+        """
+        cat {input.aligned_sam} | mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>&1 >{output} | grep -vF "{params.ignore_string}" >{log.nonconverted}
+        """
 
 
 ### fixmate, sort, and markdup
@@ -339,6 +348,7 @@ rule mark_nonconverted:
 ## So now we're one large block shell command *shrug*.
 # NOTE: This is the final step in the core alignment pipeline: markdup writes a (lightly) compressed .bam file and index.
 rule samtools_fixmate_sort_markdup:
+    group: "bwa_core"
     conda: "envs/env.yaml"
     input:
         rules.mark_nonconverted.output
@@ -470,7 +480,7 @@ rule deeptools_bias_plots:
         # stats = "{DATA_PATH}/{experiment}/{sample}/deeptools/gcbias.freq.txt"
     threads: 1
     shell:
-        # TODO: Make the 2bit and compute genome size :/ -- lots of work for this to function
+        # TODO: ? Make the 2bit and compute genome size :/ -- lots of work for this to function
         "computeGCBias --verbose --numberOfProcessors {threads} --bamfile {input.bam} --effectiveGenomeSize XXXXXX --genome make.2bit --biasPlot {output.plot} --GCbiasFrequenciesFile {output.stats}"
 
 ### wgbs_tools
