@@ -25,7 +25,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -256,7 +256,7 @@ rule fastp:
         fastp_html = ensure("{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.html", non_empty=True)
     log:
         fastp_err = "{DATA_PATH}/{experiment}/{sample}/logs/fastp.log.txt"
-    threads: 1  # One thread is never rate-limiting here
+    threads: 3  # Three threads is apparently the default.
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
         # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
