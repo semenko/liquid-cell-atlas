@@ -16,24 +16,28 @@ These directories are parsed by snakemake and the preprocessing/analytical pipel
 | healthy | PBMCs from healthy donors, sometimes with cytometry data available. |
 | melanoma | Melanoma patient samples as part of a collaboration with Yale, including patients undergoing immunotherapy. |
 | crc | Colorectal tumor samples, including tumor, cfDNA, and sorted populations. |
+| --- | --- |
+| *_subsampled | The Snakemake pipline generates stably subsampled raw reads (5M reads/pair, 10M total) for more rapid analysis and experimentation. |
 
 ## Data Structure
 
 Raw data files are processed and analyzed by our [Snakemake workflow](../workflow). Within each project directory, the output is (roughly) structured as:
 
-    project/   	   	        # e.g. melanoma / crc / healthy_pbmc / epcam_spike, etc.
-    │   aligned.sam             # The final alignment file (along with indices)
-    ├── raw/
-    │   ├── ...fastq.gz         # Raw reads
-    │   └── subsampled/         # Subsampled reads for rapid analyses
-    ├── bwameth/                # bwameth logs 
+    project/                    # e.g. melanoma / crc / healthy, etc.
+    │   SAMPLE.bam              # The final alignment file (along with indices)
     ├── fastp/                  # fastp statistics & logs
     ├── fastqc/                 # fastqc graphs 
     ├── goleft/                 # goleft coverage plots
+    ├── logs/                   # runlogs from each pipeline component
     ├── methyldackel/           # mbias plots
     ├── multiqc/                # multiqc stats
-    ├── samtools/               # samtools log data
+    ├── raw/
+    │   ├── ...fastq.gz         # Raw reads
+    |   ├── ...md5.txt          # Checksums and validation
+    ├── samtools/               # samtools statistics
     └── wgbs_tools/             # wgbs_tools .bam/.pat files
+
+Note each project also has a `_subsampled` directory with identical structure, which is the result of the pipeline run on only 10M reads/sample.
 
 ## Sample Definition Files
 
@@ -41,4 +45,4 @@ Each internal experiment has an associated .csv with key experimental metadata a
 
 ## WashU / Chaudhuri Lab Users
 
-The raw data backing these files are stored in RIS in Active/lca_data (e.g. `/storage1/fs1/aadel/Active/lca_data`), which is periodically mirrored to our local compute infrastructure (currently on aclm350 in `/logo2/lca_data`).
+The raw data backing these files are stored in RIS in Active/liquid-cell-atlas (e.g. `/storage1/fs1/aadel/Active/liquid-cell-atlas `), which is periodically mirrored to our local compute infrastructure (currently in `/r5n/liquid-cell-atlas`).
