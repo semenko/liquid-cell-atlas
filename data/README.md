@@ -1,6 +1,6 @@
 # Sequencing Data
 
-A collection of our sequencing data. Raw files aren't stored on Github (internally, they're symlinked / mounted from different volumes). Our published data can be downloaded via ***.
+A collection of our sequencing data. Raw files aren't stored on Github (internally, they're symlinked / mounted from different volumes). Our published data can be downloaded via [this Globus collection](https://app.globus.org/file-manager/collections/7e4e5850-6a7c-11ed-8fd2-e9cb7c15c7d2/overview).
 
 These directories are parsed by snakemake and the preprocessing/analytical pipelines.
   
