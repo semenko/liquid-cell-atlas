@@ -25,10 +25,13 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+
+# Only operate on EM-seq files (ignore BS-seq)
+EMSEQ_ONLY = True
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -52,6 +55,10 @@ for filename in data_config_files:
     
     if original_length != new_length:
       print(f"\tWarning: Ignoring {original_length-new_length} samples from experiment '{experiment}' that are missing required values.", file=sys.stderr)
+
+    if EMSEQ_ONLY:
+        experiment_df = experiment_df[experiment_df['method'] == 'emseq']
+        print(f"\tNOTE: Filtering to {len(experiment_df)} EM-seq only samples.")
 
     # If the subsampled flag is enabled, that means we're *operating* on subsampled data
     # (We're not making it -- it's made on regular / full runs.)
