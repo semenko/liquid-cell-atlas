@@ -325,8 +325,8 @@ rule bwa_meth:
 ### mark nonconverted reads
 # This is a clever little program from NEB that marks non-converted reads:
 # https://github.com/nebiolabs/mark-nonconverted-reads
-# This sets XX:Z:UC (the X? Y? and Z? fields of SAM/BAM are user-reserved). We do *not* set the Vendor Failed bit.
-# Note that  MethylDackel can independently identify poor conversion (set minConversionEfficiency).
+# This sets XX:Z:UC (the X? Y? and Z? fields of SAM/BAM are user-reserved). And sets the Vendor Failed bit.
+# Note that MethylDackel can independently identify poor conversion (set minConversionEfficiency).
 rule mark_nonconverted:
     group: "bwa_core"
     conda: "envs/env.yaml"
@@ -345,7 +345,7 @@ rule mark_nonconverted:
         ignore_string = "[W::sam_parse1] unrecognized reference name "
     shell:
         """
-        cat {input.aligned_sam} | mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} 2>&1 >{output} | grep -vF "{params.ignore_string}" >{log.nonconverted}
+        cat {input.aligned_sam} | mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} --flag_reads 2>&1 >{output} | grep -vF "{params.ignore_string}" >{log.nonconverted}
         """
 
 
