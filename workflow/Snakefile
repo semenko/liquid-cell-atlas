@@ -529,6 +529,7 @@ rule wgbs_tools_index:
         """
 
 ### WGBS pat/beta file formats
+# Licensing here sucks, so disabled for now :(
 rule wgbs_tools_pat_beta:
     conda: "envs/env.yaml"
     input:
@@ -557,7 +558,7 @@ rule touch_complete_flag:
         rules.fastqc_bam.output,
         rules.methyldackel_mbias_plots.output,
         rules.goleft_indexcov.output,
-        rules.wgbs_tools_pat_beta.output
+        # rules.wgbs_tools_pat_beta.output
         # rules.deeptools_bias_plots.output
     output:
         "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete"
