@@ -28,7 +28,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Only operate on EM-seq files (ignore BS-seq)
 EMSEQ_ONLY = True
@@ -151,32 +151,33 @@ rule mask_reference_fasta:
         bedtools maskfasta -fi {DATA_PATH}/reference/GRCh38-DAC.fna -fo {output.masked_reference_genome} -bed {DATA_PATH}/reference/U2AF1-GRCh38-Exclusion.bed >>{log.maskfasta} 2>&1
         """
 
-### bwa-meth index
-# This should run once to generate indices for bwa-mem2 (through bwa-meth)
+### biscuit index
+# This should run once to generate biscuit indices
 # NOTE: We could try bwa-mem2-lisa at some point, but it's very fragile
-rule bwa_meth_index:
+rule biscuit_index:
     conda: "envs/env.yaml"
     input:
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.0123",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.amb",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.ann",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.bwt.2bit.64",
-        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.pac"
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bis.amb",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bis.ann",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bis.pac",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.dau.bwt",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.dau.sa",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.par.bwt",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.par.sa",
     log:
-        index = "{DATA_PATH}/reference/bwameth_bwa-mem2-index.log.txt"
+        index = "{DATA_PATH}/reference/biscuit_index.log.txt"
     shell:
-        "bwameth.py index-mem2 {input.masked_reference_genome} >{log.index} 2>&1"
+        "./biscuit/biscuit index {input.masked_reference_genome} >{log.index} 2>&1"
 
 ###############
-## Pull our git submodules at least once
+## Pull git submodules at least once
 ###############
 
 rule git_submodule_init:
     output:
-        "wgbs_tools/.git"
+        "biscuit/.git"
     shell:
         "git submodule update --init --recursive"
 
@@ -250,7 +251,7 @@ def trim_poly_g(input):
 # We adapter trimming and poly-g filtering, but leave quality filtering / polyN filtering for later.
 # NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
 rule fastp:
-    group: "bwa_core"
+    group: "align_core"
     conda: "envs/env.yaml"
     input:
         md5_sums = ancient(rules.md5sum.output.validated),
@@ -299,27 +300,30 @@ rule fastp:
         2>{log.fastp_err} >{output.fastp_pipe_output}
         """
 
-### bwa_meth
-# This uses bwa-mem2
-rule bwa_meth:
-    group: "bwa_core"
+### biscuit
+# Unfortunately bwameth made it very difficult to extract read-level CpG methylation data -- this wasn't
+# built into MethylDackel. After evaluating bwameth vs biscuit, the updated biscuit (>1.1, not what the old
+# pipeline ran) seems like a solid approach.
+rule biscuit:
+    group: "align_core"
     conda: "envs/env.yaml"
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
-        bwa_meth_indices = ancient(rules.bwa_meth_index.output)  # We assume ancient, to not force re-run of bwa mem vs bwa-mem2
+        biscuit_indices = ancient(rules.biscuit_index.output)
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam"))
     params:
         # TODO: Should we include the platform or barcode here? Does that have value for us?
         read_group = "@RG\\tID:{sample}\\tSM:{sample}"
     log:
-        bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
+        biscuit_err = "{DATA_PATH}/{experiment}/{sample}/logs/biscuit.log.txt"
     benchmark:
-        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/bwameth.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/biscuit.txt"
     threads: lambda x: len(os.sched_getaffinity(0))
     shell:
-        "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
+        # -p: interleaved
+        "./biscuit/biscuit align -@ {threads} -R '{params.read_group}' -p {input.reference_genome} {input.input_fasta} 2>{log.biscuit_err} >{output}"
 
 
 ### mark nonconverted reads
@@ -328,7 +332,7 @@ rule bwa_meth:
 # This sets XX:Z:UC (the X? Y? and Z? fields of SAM/BAM are user-reserved). And sets the Vendor Failed bit.
 # Note that MethylDackel can independently identify poor conversion (set minConversionEfficiency).
 rule mark_nonconverted:
-    group: "bwa_core"
+    group: "align_core"
     conda: "envs/env.yaml"
     input:
         aligned_sam = "{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam",
@@ -339,7 +343,7 @@ rule mark_nonconverted:
         nonconverted = "{DATA_PATH}/{experiment}/{sample}/logs/mark-nonconverted.log.txt"
     params:
         threshold = 3, # If 3 nonconverted Cs on a read, consider it nonconverted
-        # NOTE: We spew lots of warnings from samtools, specifically: [W::sam_parse1] unrecognized reference name ""; treated as unmapped
+        # NOTE: We spew lots of this warnin from samtools: [W::sam_parse1] unrecognized reference name ""; treated as unmapped
         # This string will be filtered from our log file.
         # TODO: Further investigate this warning
         ignore_string = "[W::sam_parse1] unrecognized reference name "
@@ -355,7 +359,7 @@ rule mark_nonconverted:
 ## So now we're one large block shell command *shrug*.
 # NOTE: This is the final step in the core alignment pipeline: markdup writes a (lightly) compressed .bam file and index.
 rule samtools_fixmate_sort_markdup:
-    group: "bwa_core"
+    group: "align_core"
     conda: "envs/env.yaml"
     input:
         rules.mark_nonconverted.output
@@ -490,21 +494,22 @@ rule deeptools_bias_plots:
         # TODO: ? Make the 2bit and compute genome size :/ -- lots of work for this to function
         "computeGCBias --verbose --numberOfProcessors {threads} --bamfile {input.bam} --effectiveGenomeSize XXXXXX --genome make.2bit --biasPlot {output.plot} --GCbiasFrequenciesFile {output.stats}"
 
-### wgbs_tools
-# Build wgbs_tools, requires libboost
-# Bit of a hackjob to build this here...
+### biscuit
+# Build biscuit, requires libcurl4-gnutls-dev
+# Bit of a hackjob to build this here, but conda is a little bit out of date
 rule wgbs_build:
     conda: "envs/env.yaml"
     input:
         git_submodule_init = ancient(rules.git_submodule_init.output)
     output:
-        "wgbs_tools/src/python/wgbs_tools.py"
+        "biscuit/biscuit"
     log:
-        "wgbs_tools/snakemake_build.log.txt"
+        "biscuit/biscuit_build.log.txt"
     shell:
-        "cd wgbs_tools && python setup.py >{log} 2>&1"
+        "cd biscuit && make >{log} 2>&1"
 
-# Generate index
+# Generate wgbs_tools index
+# ABANDONED, pending wgbs_tools complete deletion
 rule wgbs_tools_index:
     conda: "envs/env.yaml"
     input:
@@ -593,4 +598,3 @@ onsuccess:
 
 onerror:
     shell('curl -H "Title: Failure" -H "Tags: warning" -d "Job failure on $HOSTNAME" ntfy.sh/semenko-snakemake')
-

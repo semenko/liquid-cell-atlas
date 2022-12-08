@@ -2,3 +2,6 @@
 	path = workflow/wgbs_tools
 	url = https://github.com/nloyfer/wgbs_tools
 	ignore = untracked
+[submodule "workflow/biscuit"]
+	path = workflow/biscuit
+	url = https://github.com/huishenlab/biscuit
