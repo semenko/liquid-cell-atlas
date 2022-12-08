@@ -25,10 +25,10 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Only operate on EM-seq files (ignore BS-seq)
 EMSEQ_ONLY = True
@@ -201,9 +201,10 @@ rule biscuit_qc_index:
         biscuit_index = ancient(rules.biscuit_index.output),
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
+        "{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
+        "{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.bot10p.bed.gz",
+        "{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.top10p.bed.gz",
         path = "{DATA_PATH}/reference/biscuit_qc/",
-#        "{DATA_PATH}/reference/biscuit_qc/",
-#        "{DATA_PATH}/reference/biscuit_qc/",
     log:
         "{DATA_PATH}/reference/biscuit_qc/biscuit_qc.log.txt"
     params:
@@ -427,25 +428,24 @@ rule samtools_fixmate_sort_markdup:
 ### Statistics and QC Graphs
 ###############
 
-### biscuit QC script
+### biscuit QC script : BROKEN?
 # Usage: QC.sh [-h,--help] [-s,--single-end] [-v,--vcf] [-o,--outdir] [-k,--keep-tmp-files] [-n,--no-cov-qc] assets_directory genome sample_name in_bam
 rule biscuit_qc:
-    # conda: "envs/env.yaml"
+    conda: "envs/env.yaml" # Used only for gnu parallel?
     input:
         bam = rules.samtools_fixmate_sort_markdup.output.bam,
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
         biscuit_qc_index = rules.biscuit_qc_index.output.path,
     output:
-        "{DATA_PATH}/{experiment}/{sample}/biscuit/WHAT",
-        # "MORE"
+        "{DATA_PATH}/{experiment}/{sample}/biscuit/{sample}_cv_table.txt", # This makes *tons* of output, but this is the last file generated.
     log:
-        "{DATA_PATH}/{experiment}/{sample}/logs/biscuit-qc.log.txt"
+        "{DATA_PATH}/{experiment}/{sample}/logs/biscuit_qc.log.txt"
     params:
         out_dir = "{DATA_PATH}/{experiment}/{sample}/biscuit/",
         sample_str = "{sample}",
     threads: 1
     shell:
-        "./biscuit/scripts/QC.sh --outdir {params.out_dir} {input.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
+        "PATH=$PATH:./biscuit/ && ./biscuit/scripts/QC.sh --outdir {params.out_dir} {input.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
 
 ### samtools index
 rule samtools_index:
@@ -557,7 +557,7 @@ rule deeptools_bias_plots:
 rule touch_complete_flag:
     conda: "envs/env.yaml"
     input:
-        rules.biscuit_qc.output,
+        # rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
         rules.methyldackel_mbias_plots.output,
