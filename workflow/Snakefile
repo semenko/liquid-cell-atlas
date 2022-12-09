@@ -25,7 +25,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -179,7 +179,7 @@ rule biscuit_build:
 rule biscuit_index:
     # conda: "envs/env.yaml"
     input:
-        masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
+        masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
     output:
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bis.amb",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bis.ann",
@@ -199,6 +199,7 @@ rule biscuit_qc_index:
     # conda: "envs/env.yaml"  # TODO: Add perl for this? (bleh)
     input:
         biscuit_index = ancient(rules.biscuit_index.output),
+        biscuit_path = ancient(rules.biscuit_build.output),
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
         "{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
@@ -348,6 +349,7 @@ rule biscuit:
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
+        biscuit_path = ancient(rules.biscuit_build.output),
         biscuit_indices = ancient(rules.biscuit_index.output)
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam"))
