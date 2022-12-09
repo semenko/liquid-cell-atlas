@@ -416,12 +416,12 @@ rule samtools_fixmate_sort_markdup:
     shell:
         # fixmate is needed for markdup -- it adds ms and MC tags
         # fixmate: -u uncompressed output / -m add mate score tag
-        # sort: coodinate sorted, uncompressed sam
+        # sort: coodinate sorted, uncompressed sam, sort -m is memory *per thread*
         # TODO: Mark supplementary reads of duplicates as duplicates? (-S)
         # TODO: Specify index name here? Build an idx first? e.g. "-##idx##indexname"
         """
         cat {input} | samtools fixmate -u -m --output-fmt SAM --threads 1 - - 2>{log.fixmate} | \
-        samtools sort --output-fmt SAM --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
+        samtools sort --output-fmt SAM -m 4G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
         samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {threads} -T {resources.tmpdir} - {output.bam} 2> {log.markdup}
         """
 
