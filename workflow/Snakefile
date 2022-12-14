@@ -25,7 +25,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -298,7 +298,7 @@ rule fastp:
         r2_file = rules.md5sum.input.r2_file,
     output:
         fastp_pipe_output = temp(pipe("{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa")),
-        fastp_failed = "{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa",  # Length < 15
+        fastp_failed = "{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa.gz",  # Length < 15
         fastp_json = ensure("{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.json", non_empty=True),
         fastp_html = ensure("{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.html", non_empty=True)
     log:
@@ -393,7 +393,7 @@ rule mark_nonconverted:
         """
 
 
-### fixmate, sort, and markdup
+### fixmate, sort, markdup, bsstrand
 ## These were originally defined as named pipes between snakemake blocks,
 ## but I ran into a group bug that I couldn't work around: https://github.com/snakemake/snakemake/issues/1822 
 ## So now we're one large block shell command *shrug*.
@@ -402,14 +402,17 @@ rule samtools_fixmate_sort_markdup:
     group: "align_core"
     conda: "envs/env.yaml"
     input:
-        rules.mark_nonconverted.output
+        mark_nonconv = rules.mark_nonconverted.output,
+        reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
+        biscuit_path = ancient(rules.biscuit_build.output),
     output:
         bam = protected("{DATA_PATH}/{experiment}/{sample}/{sample}.bam"),
         stats_file = ensure("{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.markdup.txt", non_empty=True)
     log:
         fixmate = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt",
         sort = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt",
-        markdup = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-markdup.log.txt"
+        markdup = "{DATA_PATH}/{experiment}/{sample}/logs/samtools-markdup.log.txt",
+        bsstrand = "{DATA_PATH}/{experiment}/{sample}/logs/biscuit-bsstrand.log.txt"
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/samtools.txt"
     threads: 4
@@ -418,36 +421,18 @@ rule samtools_fixmate_sort_markdup:
         # fixmate: -u uncompressed output / -m add mate score tag
         # sort: coodinate sorted, uncompressed sam, sort -m is memory *per thread*
         # TODO: Mark supplementary reads of duplicates as duplicates? (-S)
-        # TODO: Specify index name here? Build an idx first? e.g. "-##idx##indexname"
+        # biscuit: -c correct YD tag, -y append YC and YG tags
         """
-        cat {input} | samtools fixmate -u -m --output-fmt SAM --threads 1 - - 2>{log.fixmate} | \
+        cat {input.mark_nonconv} | samtools fixmate -u -m --output-fmt SAM --threads 1 - - 2>{log.fixmate} | \
         samtools sort --output-fmt SAM -m 4G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
-        samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --write-index --threads {threads} -T {resources.tmpdir} - {output.bam} 2> {log.markdup}
+        samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --threads {threads} -T {resources.tmpdir} - - 2>{log.markdup} | \
+        ./biscuit/biscuit bsstrand -c -y {input.reference_genome} - {output.bam} >{log.bsstrand} 2>&1
         """
 
 
 ###############
 ### Statistics and QC Graphs
 ###############
-
-### biscuit QC script : BROKEN?
-# Usage: QC.sh [-h,--help] [-s,--single-end] [-v,--vcf] [-o,--outdir] [-k,--keep-tmp-files] [-n,--no-cov-qc] assets_directory genome sample_name in_bam
-rule biscuit_qc:
-    conda: "envs/env.yaml" # Used only for gnu parallel?
-    input:
-        bam = rules.samtools_fixmate_sort_markdup.output.bam,
-        masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
-        biscuit_qc_index = rules.biscuit_qc_index.output.path,
-    output:
-        "{DATA_PATH}/{experiment}/{sample}/biscuit/{sample}_cv_table.txt", # This makes *tons* of output, but this is the last file generated.
-    log:
-        "{DATA_PATH}/{experiment}/{sample}/logs/biscuit_qc.log.txt"
-    params:
-        out_dir = "{DATA_PATH}/{experiment}/{sample}/biscuit/",
-        sample_str = "{sample}",
-    threads: 1
-    shell:
-        "PATH=$PATH:./biscuit/ && ./biscuit/scripts/QC.sh --outdir {params.out_dir} {input.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
 
 ### samtools index
 rule samtools_index:
@@ -485,6 +470,27 @@ rule samtools_statistics:
         samtools stats {input.bam} 2>{log.stats} >{output.stats}
         """
 
+### biscuit QC script : BROKEN? --> patched!
+# Usage: QC.sh [-h,--help] [-s,--single-end] [-v,--vcf] [-o,--outdir] [-k,--keep-tmp-files] [-n,--no-cov-qc] assets_directory genome sample_name in_bam
+rule biscuit_qc:
+    conda: "envs/env.yaml" # Used only for gnu parallel?
+    input:
+        bam = rules.samtools_fixmate_sort_markdup.output.bam,
+        masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
+        biscuit_qc_index = rules.biscuit_qc_index.output.path,
+        index = rules.samtools_index.output,
+    output:
+        "{DATA_PATH}/{experiment}/{sample}/biscuit/{sample}_cv_table.txt", # This makes *tons* of output, but this is the last file generated.
+    log:
+        "{DATA_PATH}/{experiment}/{sample}/logs/biscuit_qc.log.txt"
+    params:
+        out_dir = "{DATA_PATH}/{experiment}/{sample}/biscuit/",
+        sample_str = "{sample}",
+    threads: 1
+    shell:
+        "PATH=$PATH:./biscuit/ && ./biscuit/scripts/QC.sh --outdir {params.out_dir} {input.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
+
+        
 ### MethylDackel mbias
 rule methyldackel_mbias_plots:
     conda: "envs/env.yaml"
@@ -540,7 +546,7 @@ rule goleft_indexcov:
 
 ### DeepTools bias plots
 # For GC bias, see https://deeptools.readthedocs.io/en/develop/content/tools/computeGCBias.html
-# TODO: Implement this
+# TODO: Implement this?
 rule deeptools_bias_plots:
     conda: "envs/env.yaml"
     input:
@@ -559,7 +565,7 @@ rule deeptools_bias_plots:
 rule touch_complete_flag:
     conda: "envs/env.yaml"
     input:
-        # rules.biscuit_qc.output,
+        rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
         rules.methyldackel_mbias_plots.output,
