@@ -25,7 +25,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/crc.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -424,7 +424,7 @@ rule samtools_fixmate_sort_markdup:
         # biscuit: -c correct YD tag, -y append YC and YG tags
         """
         cat {input.mark_nonconv} | samtools fixmate -u -m --output-fmt SAM --threads 1 - - 2>{log.fixmate} | \
-        samtools sort --output-fmt SAM -m 4G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
+        samtools sort --output-fmt SAM -m 8G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
         samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --threads {threads} -T {resources.tmpdir} - - 2>{log.markdup} | \
         ./biscuit/biscuit bsstrand -c -y {input.reference_genome} - {output.bam} >{log.bsstrand} 2>&1
         """
