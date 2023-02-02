@@ -25,10 +25,10 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
 
 # Uncomment for test runs
-# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Only operate on EM-seq files (ignore BS-seq)
 EMSEQ_ONLY = True
@@ -152,32 +152,13 @@ rule mask_reference_fasta:
         """
 
 ###############
-## Build biscuit code & indices
+## Build biscuit indices
 ###############
-
-rule git_submodule_init:
-    output:
-        "biscuit/.git"
-    shell:
-        "git submodule update --init --recursive"
-
-### Build biscuit
-# Bit of a hackjob to build this here, but conda is a little bit out of date
-rule biscuit_build:
-    conda: "envs/env.yaml"  # env exclusively for libcurl build deps
-    input:
-        git_submodule_init = ancient(rules.git_submodule_init.output)
-    output:
-        "biscuit/biscuit"
-    log:
-        "biscuit/biscuit_build.log.txt"
-    shell:
-        "make -C biscuit/ >{log} 2>&1"
 
 ### biscuit index
 # Runs once to generate biscuit indices
 rule biscuit_index:
-    # conda: "envs/env.yaml"
+    conda: "envs/env.yaml"
     input:
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
     output:
@@ -191,15 +172,14 @@ rule biscuit_index:
     log:
         index = "{DATA_PATH}/reference/biscuit_index.log.txt"
     shell:
-        "./biscuit/biscuit index {input.masked_reference_genome} >{log.index} 2>&1"
+        "biscuit index {input.masked_reference_genome} >{log.index} 2>&1"
 
 ### biscuit QC index
 # Runs once for the post-alignent QC tools (parsed by multiqc)
 rule biscuit_qc_index:
-    # conda: "envs/env.yaml"  # TODO: Add perl for this? (bleh)
+    conda: "envs/env.yaml"  # TODO: Add perl for this? (bleh)
     input:
         biscuit_index = ancient(rules.biscuit_index.output),
-        biscuit_path = ancient(rules.biscuit_build.output),
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
         "{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
@@ -217,7 +197,7 @@ rule biscuit_qc_index:
         # and a shared resource directory?
         """
         mkdir {params.out_dir}
-        perl ./biscuit/scripts/build_biscuit_QC_assets.pl --verbose --ref {input.masked_reference_genome} --outdir {params.out_dir} >{log} 2>&1
+        build_biscuit_QC_assets.pl --verbose --ref {input.masked_reference_genome} --outdir {params.out_dir} >{log} 2>&1
         """
 
 ###############
@@ -349,7 +329,6 @@ rule biscuit:
     input:
         input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
-        biscuit_path = ancient(rules.biscuit_build.output),
         biscuit_indices = ancient(rules.biscuit_index.output)
     output:
         temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam"))
@@ -363,7 +342,7 @@ rule biscuit:
     threads: lambda x: len(os.sched_getaffinity(0))
     shell:
         # -p: interleaved
-        "./biscuit/biscuit align -@ {threads} -R '{params.read_group}' -p {input.reference_genome} {input.input_fasta} 2>{log.biscuit_err} >{output}"
+        "biscuit align -@ {threads} -R '{params.read_group}' -p {input.reference_genome} {input.input_fasta} 2>{log.biscuit_err} >{output}"
 
 
 ### mark nonconverted reads
@@ -404,7 +383,6 @@ rule samtools_fixmate_sort_markdup:
     input:
         mark_nonconv = rules.mark_nonconverted.output,
         reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
-        biscuit_path = ancient(rules.biscuit_build.output),
     output:
         bam = protected("{DATA_PATH}/{experiment}/{sample}/{sample}.bam"),
         stats_file = ensure("{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.markdup.txt", non_empty=True)
@@ -426,7 +404,7 @@ rule samtools_fixmate_sort_markdup:
         cat {input.mark_nonconv} | samtools fixmate -u -m --output-fmt SAM --threads 1 - - 2>{log.fixmate} | \
         samtools sort --output-fmt SAM -m 8G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
         samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --threads {threads} -T {resources.tmpdir} - - 2>{log.markdup} | \
-        ./biscuit/biscuit bsstrand -c -y {input.reference_genome} - {output.bam} >{log.bsstrand} 2>&1
+        biscuit bsstrand -c -y {input.reference_genome} - {output.bam} >{log.bsstrand} 2>&1
         """
 
 
@@ -477,11 +455,10 @@ rule samtools_statistics:
 # TODO: Add a filtering option to target specific .bed regions? (epiread supports this with the -g option, I think)
 # TODO: Investigate pairwise mode?
 rule biscuit_epiread:
-    conda: "envs/env.yaml" # TODO: Transition to biscuit in envs/ when released
+    conda: "envs/env.yaml"
     input:
         bam = rules.samtools_fixmate_sort_markdup.output.bam,
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
-        biscuit_path = ancient(rules.biscuit_build.output), # Forces biscuit to build, # TODO: remove when envs/ is used
     output:
         "{DATA_PATH}/{experiment}/{sample}/epibeds/{sample}.epibed.gz",
         "{DATA_PATH}/{experiment}/{sample}/epibeds/{sample}.epibed.gz.tbi"
@@ -494,7 +471,7 @@ rule biscuit_epiread:
     shell:
         """
         mkdir -p {params.out_dir}
-        PATH=$PATH:./biscuit/ && ./biscuit/biscuit epiread -@ {threads} {input.masked_reference_genome} {input.bam} 2>{log} | LC_ALL=C sort -S 5% --parallel={threads} -k1,1 -k2,2n | bgzip > {params.out_dir}/{params.sample_str}.epibed.gz
+        biscuit epiread -@ {threads} {input.masked_reference_genome} {input.bam} 2>{log} | LC_ALL=C sort -S 5% --parallel={threads} -k1,1 -k2,2n | bgzip > {params.out_dir}/{params.sample_str}.epibed.gz
         tabix -p bed {params.out_dir}/{params.sample_str}.epibed.gz
         """
 
@@ -502,7 +479,7 @@ rule biscuit_epiread:
 ### biscuit QC script
 # Usage: QC.sh [-h,--help] [-s,--single-end] [-v,--vcf] [-o,--outdir] [-k,--keep-tmp-files] [-n,--no-cov-qc] assets_directory genome sample_name in_bam
 rule biscuit_qc:
-    conda: "envs/env.yaml" # TODO: Transition to biscuit in envs/ when released
+    conda: "envs/env.yaml"
     input:
         bam = rules.samtools_fixmate_sort_markdup.output.bam,
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
@@ -517,7 +494,7 @@ rule biscuit_qc:
         sample_str = "{sample}",
     threads: 1
     shell:
-        "PATH=$PATH:./biscuit/ && ./biscuit/scripts/QC.sh --outdir {params.out_dir} {input.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
+        "QC.sh --outdir {params.out_dir} {input.biscuit_qc_index} {input.masked_reference_genome} {params.sample_str} {input.bam} >{log} 2>&1"
 
         
 ### MethylDackel mbias
