@@ -12,28 +12,20 @@
 Deconvolute cell-free DNA using methylation patterns, with a focus on ultra-low frequency cell populations and immune lineages.
 </div>
 
+# Core Components
+
+## Pipeline
+
+The [workflow](/workflow/) directory includes a detailed snakemake pipeline to analyze both EM-seq and BS-seq data, with reproducible QC.
+
+## Data
+
+The [data](/data/) directory contains the results of our large sequencing experiments in the manuscript, including melanoma, CRC, and healthy samples.
 
 
-## Subcomponents
+## Citation
 
-To kick off this project, we've broken out key tasks into individual folders. Once our code matures, we'll modularize things, add tests, and combine this into a single package.
-
-* Data Wrangling
-    * External Data
-        * Data aggregation & annotation
-    * Internal data
-        * Preprocessing pipeline (snakemake?)
-        * Data aggregation & annotation
-    * Data preprocessing
-        * Convert to [.pat](https://github.com/nloyfer/wgbs_tools/blob/master/docs/pat_format.md) (or [.beta](https://github.com/nloyfer/wgbs_tools/blob/master/docs/beta_format.md)?)
-* Modeling (Code)
-    * Simple fingerprint models
-    * Tensorflow-stored models
-        * TFDF / Gradient Boosted
-        * TabNet
-* Testing
-    * CyTOF & FACS Data
-    * Stats & Graphs
+- TBD
 
 ## License
 

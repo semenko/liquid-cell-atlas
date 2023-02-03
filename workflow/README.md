@@ -3,6 +3,32 @@
 A standardized WGBS pipeline for our internally generated WGBS bisulfite & EM-seq data. This goes from .fastq to methylation calls (via bwa-meth) and extensive QC and plotting, using a Snakemake pipeline.
 
 
+## Output Data Structure
+
+Raw data files from [data](../data) are processed and analyzed by this snakemake workflow. Within each project directory, the output is (roughly) structured as:
+
+    SAMPLE_01/                  # e.g. melanoma / crc / healthy, etc.
+    │   SAMPLE.bam              # The final alignment file 
+    |   SAMPLE.bam.bai          #   (and its index)
+    |── biscuit_qc/             # biscuit QC.sh text files
+    |── epibeds/                # epibed files (bgzip-compressed & tabix-indexed)
+    ├── fastp/                  # fastp statistics & logs
+    ├── fastqc/                 # fastqc graphs 
+    ├── goleft/                 # goleft coverage plots
+    ├── logs/                   # runlogs from each pipeline component
+    ├── methyldackel/           # mbias plots
+    ├── raw/
+    │   ├── ...fastq.gz         # Raw reads
+    |   ├── ...md5.txt          # Checksums and validation
+    ├── samtools/               # samtools statistics
+    SAMPLE_02/
+    ...
+    ...
+    multiqc/                    # A project-level multiqc stats across all data
+
+Note each project also has a `_subsampled` directory with identical structure, which is the result of the pipeline run on only 10M reads/sample.
+
+
 ## Reference Genome
 
 I chose GRCh38, with these specifics:
@@ -16,19 +42,25 @@ You can see a good explanation of the rationale for some of these components at 
 
 ## Requirements
 
-All software requirements are specified in `env.yaml` except for:
-- NEB's [mark-nonconverted-reads.py package](https://github.com/nebiolabs/mark-nonconverted-reads) -- which is a git submodule here
-- [wgbs_tools](https://github.com/nloyfer/wgbs_tools) —- not currently built due to its complexity (TODO: build this dynamically? check its existence in the Snakemake file?)
+All software requirements are now specified in `env.yaml`.
+
+You'll need `snakemake` to run the pipeline.
 
 ## Trimming Approach
 
-For **EMseq**, I trim ***
+I chose a relatively conservative approach to trimming -- which is needed due to end-repair bias, adaptase bias, and more. 
 
-For **BSseq**, I trim ***
+For **EMseq**, I trim 10 bp everywhere, from offline discussions with NEB. See some of my notes here: https://github.com/FelixKrueger/Bismark/issues/509
 
-For all reads, I set `--trim_poly_g`, and set a `--length_required` (minimum read length) of 10 bp.
+For **BSseq**, I trim 15 bp 5' R2, and 10 bp everywhere else due to significant adaptase bias.
+
+For all reads, I set `--trim_poly_g` (see https://sequencing.qcfail.com/articles/illumina-2-colour-chemistry-can-overcall-high-confidence-g-bases/) and set a `--length_required` (minimum read length) of 10 bp.
+
+## No Quality Filtering
 
 Notably I do NOT do quality filtering here (I set `--disable_quality_filtering`), and save this for downstream analyses as desired.
+
+I experimented with more stringent quality filtering early on, and found it had little yield / performance benefit. 
 
 ## Background & Inspiration
 
@@ -42,23 +74,9 @@ For similar pipelines and inspiration, see:
 - The Snakepipes [WGBS pipeline](https://snakepipes.readthedocs.io/en/latest/content/workflows/WGBS.html)
 
 
-## Random Notes
- --nextseq INT?: see https://sequencing.qcfail.com/articles/illumina-2-colour-chemistry-can-overcall-high-confidence-g-bases/
- This sets --nextseq-trim=3'CUTOFF within Cutadapt and ignores G base quality -- mutually exclusive with -q
-
-EMseq 10 / 10 clipping? --clip_R1 10 --clip_R2 10 https://github.com/FelixKrueger/Bismark/issues/419
-
-"""
-For paired-end BS-Seq, it is recommended to remove the first few bp because the end-repair reaction may introduce a bias towards low methylation. Please refer to the M-bias plot section in the Bismark User Guide for some examples.
-"""
-
-`--clip_R1 5 --clip_R2 3 --three_prime_clip_R1 1 --three_prime_clip_R2 1`
---dovetail ?
-
-
 ## Pipeline Graph
 
-Here's a high-level overview of the Snakemake pipeline, generated via `snakemake --rulegraph | dot -Tpng > rules.png`
+Here's a high-level overview of the Snakemake pipeline (generated via `snakemake --rulegraph | dot -Tpng > rules.png`)
 
 <p align="center">
 <img src="https://user-images.githubusercontent.com/167135/185484931-ccfa0549-6898-44e1-9be2-ee0cf25ee6b2.png" width="500">

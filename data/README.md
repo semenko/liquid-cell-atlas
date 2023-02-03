@@ -19,29 +19,38 @@ These directories are parsed by snakemake and the preprocessing/analytical pipel
 | --- | --- |
 | *_subsampled | The Snakemake pipline generates stably subsampled raw reads (5M reads/pair, 10M total) for more rapid analysis and experimentation. |
 
-## Data Structure
 
-Raw data files are processed and analyzed by our [Snakemake workflow](../workflow). Within each project directory, the output is (roughly) structured as:
+## Output Data Structure
 
-    project/                    # e.g. melanoma / crc / healthy, etc.
-    │   SAMPLE.bam              # The final alignment file (along with indices)
+Raw data files from [data](../data) are processed and analyzed by our [Snakemake workflow](../workflow). Within each project directory, the output is (roughly) structured as:
+
+    SAMPLE_01/                  # e.g. melanoma / crc / healthy, etc.
+    │   SAMPLE.bam              # The final alignment file 
+    |   SAMPLE.bam.bai          #   (and its index)
+    |── biscuit_qc/             # biscuit QC.sh text files
+    |── epibeds/                # epibed files (bgzip-compressed & tabix-indexed)
     ├── fastp/                  # fastp statistics & logs
     ├── fastqc/                 # fastqc graphs 
     ├── goleft/                 # goleft coverage plots
     ├── logs/                   # runlogs from each pipeline component
     ├── methyldackel/           # mbias plots
-    ├── multiqc/                # multiqc stats
     ├── raw/
     │   ├── ...fastq.gz         # Raw reads
     |   ├── ...md5.txt          # Checksums and validation
     ├── samtools/               # samtools statistics
-    └── wgbs_tools/             # wgbs_tools .bam/.pat files
+    SAMPLE_02/
+    ...
+    ...
+    multiqc/                    # A project-level multiqc stats across all data
 
 Note each project also has a `_subsampled` directory with identical structure, which is the result of the pipeline run on only 10M reads/sample.
+
+
 
 ## Sample Definition Files
 
 Each internal experiment has an associated .csv with key experimental metadata and information. Most samples were sequenced by [MedGenome](https://research.medgenome.com/), though some were sequenced by the [McDonnell Genome Institute](https://www.genome.wustl.edu/). Of note, the "batch" in each sample is arbitrary -- and just a unique identifier for samples run on the same batch (e.g. batch B00 was not necessarily sequenced before or after batch B01). 
+
 
 ## WashU / Chaudhuri Lab Users
 
