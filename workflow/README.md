@@ -79,5 +79,5 @@ For similar pipelines and inspiration, see:
 Here's a high-level overview of the Snakemake pipeline (generated via `snakemake --rulegraph | dot -Tpng > rules.png`)
 
 <p align="center">
-<img src="ttps://user-images.githubusercontent.com/167135/216741276-7113ab3c-b7fc-42f6-b917-77a9c6b68398.png" width="500">
+<img src="https://user-images.githubusercontent.com/167135/216741276-7113ab3c-b7fc-42f6-b917-77a9c6b68398.png" width="500">
 </p>
