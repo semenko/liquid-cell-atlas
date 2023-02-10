@@ -448,10 +448,10 @@ rule samtools_statistics:
         samtools stats {input.bam} 2>{log.stats} >{output.stats}
         """
 
-### biscuit pipeup/vcf/bed
-# Generate a vcf file of all methylation calls
+### biscuit pipeup to bed
+# Generate a bed file of all methylation calls
+# Note we make this one long pipe, since the .vcf is enormous (~10GB/alignment), and we don't need to keep it around.
 # Note: mergecg expects a sorted .bed, which this is from our output of biscuit vcf2bed
-# TODO: sort these? (e.g. LC_ALL=C sort -k1,1 -k2,2n)
 rule biscuit_vcf_bed:
     conda: "envs/env.yaml"
     input:
@@ -459,10 +459,8 @@ rule biscuit_vcf_bed:
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
         index = rules.samtools_index.output,
     output:
-        pileup = "{DATA_PATH}/{experiment}/{sample}/beds/{sample}.vcf.gz",
         bed = "{DATA_PATH}/{experiment}/{sample}/beds/{sample}.bed.gz",
         tbi = "{DATA_PATH}/{experiment}/{sample}/beds/{sample}.bed.gz.tbi",
-
     log:
         pileup = "{DATA_PATH}/{experiment}/{sample}/logs/biscuit-pileup.log.txt",
         vcf2bed = "{DATA_PATH}/{experiment}/{sample}/logs/biscuit-vcf2bed.log.txt"
@@ -473,9 +471,12 @@ rule biscuit_vcf_bed:
     threads: 4
     shell:
         """
-        biscuit pileup -@ {threads} {input.masked_reference_genome} {input.bam} 2>{log.pileup} | bgzip > {params.out_dir}/{params.sample_str}.vcf.gz
-        tabix -p vcf {params.out_dir}/{params.sample_str}.vcf.gz
-        biscuit vcf2bed -k {params.minimum_reads} -t cg {params.out_dir}/{params.sample_str}.vcf.gz 2>{log.vcf2bed} | biscuit mergecg {input.masked_reference_genome} - | bgzip > {params.out_dir}/{params.sample_str}.bed.gz
+        biscuit pileup -@ {threads} {input.masked_reference_genome} {input.bam} 2>{log.pileup} | \
+        biscuit vcf2bed -k {params.minimum_reads} -t cg - 2>{log.vcf2bed} | \
+        LC_ALL=C sort -k1,1 -k2,2n | \
+        biscuit mergecg {input.masked_reference_genome} - | \
+        bgzip --compress-level 9 > {params.out_dir}/{params.sample_str}.bed.gz
+
         tabix -p bed {params.out_dir}/{params.sample_str}.bed.gz
         """
 
