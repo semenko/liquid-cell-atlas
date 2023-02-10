@@ -448,12 +448,44 @@ rule samtools_statistics:
         samtools stats {input.bam} 2>{log.stats} >{output.stats}
         """
 
+### biscuit pipeup/vcf/bed
+# Generate a vcf file of all methylation calls
+# Note: mergecg expects a sorted .bed, which this is from our output of biscuit vcf2bed
+# TODO: sort these? (e.g. LC_ALL=C sort -k1,1 -k2,2n)
+rule biscuit_vcf_bed:
+    conda: "envs/env.yaml"
+    input:
+        bam = rules.samtools_fixmate_sort_markdup.output.bam,
+        masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome),
+        index = rules.samtools_index.output,
+    output:
+        pileup = "{DATA_PATH}/{experiment}/{sample}/beds/{sample}.vcf.gz",
+        bed = "{DATA_PATH}/{experiment}/{sample}/beds/{sample}.bed.gz",
+        tbi = "{DATA_PATH}/{experiment}/{sample}/beds/{sample}.bed.gz.tbi",
+
+    log:
+        pileup = "{DATA_PATH}/{experiment}/{sample}/logs/biscuit-pileup.log.txt",
+        vcf2bed = "{DATA_PATH}/{experiment}/{sample}/logs/biscuit-vcf2bed.log.txt"
+    params:
+        out_dir = "{DATA_PATH}/{experiment}/{sample}/beds/",
+        sample_str = "{sample}",
+        minimum_reads = 3,
+    threads: 4
+    shell:
+        """
+        biscuit pileup -@ {threads} {input.masked_reference_genome} {input.bam} 2>{log.pileup} | bgzip > {params.out_dir}/{params.sample_str}.vcf.gz
+        tabix -p vcf {params.out_dir}/{params.sample_str}.vcf.gz
+        biscuit vcf2bed -k {params.minimum_reads} -t cg {params.out_dir}/{params.sample_str}.vcf.gz 2>{log.vcf2bed} | biscuit mergecg {input.masked_reference_genome} - | bgzip > {params.out_dir}/{params.sample_str}.bed.gz
+        tabix -p bed {params.out_dir}/{params.sample_str}.bed.gz
+        """
+
 ### biscuit epiread/epibed export
 # This generates a bgzip-compressed, tabix-indexed file of epireads.
 # See the biscuit epiread/epibed format description here: https://huishenlab.github.io/biscuit/docs/epiread
 # Note that we can do filtering here, including quality / alignment score filtering: https://huishenlab.github.io/biscuit/biscuit_epiread/
 # TODO: Add a filtering option to target specific .bed regions? (epiread supports this with the -g option, I think)
 # TODO: Investigate pairwise mode?
+# NOTE: Temporarily disabled, using vcf/bed above
 rule biscuit_epiread:
     conda: "envs/env.yaml"
     input:
@@ -556,7 +588,7 @@ rule goleft_indexcov:
 rule touch_complete_flag:
     conda: "envs/env.yaml"
     input:
-        rules.biscuit_epiread.output,
+        # rules.biscuit_epiread.output,
         rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
