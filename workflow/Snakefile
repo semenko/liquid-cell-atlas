@@ -58,7 +58,7 @@ for filename in data_config_files:
 
     if EMSEQ_ONLY:
         experiment_df = experiment_df[experiment_df["method"] == "emseq"]
-        print(f"\tNOTE: Filtering to {len(experiment_df)} EM-seq only samples.")
+        print(f"\tNOTE: Filtering to {len(experiment_df)} EM-seq only samples.", file=sys.stderr)
 
     # If the subsampled flag is enabled, that means we're *operating* on subsampled data
     # (We're not making it -- it's made on regular / full runs.)
@@ -478,9 +478,9 @@ rule samtools_statistics:
 
 ### biscuit pipeup to bed
 # Generate a bed file of all methylation calls
-# Note we make this one long pipe, since the .vcf is enormous (~10GB/alignment), and we don't need to keep it around.
-# Note: mergecg expects a sorted .bed, which this is from our output of biscuit vcf2bed
-rule biscuit_vcf_bed:
+# We make this one long pipe, since the .vcf is enormous (~10GB/alignment), and we don't need to keep it around.
+# NOTE: mergecg expects a sorted .bed -- I'm pretty sure the sort here is unnecessary, but it's cheap enough.
+rule biscuit_bed:
     conda:
         "envs/env.yaml"
     input:
@@ -628,6 +628,7 @@ rule touch_complete_flag:
         "envs/env.yaml"
     input:
         # rules.biscuit_epiread.output,
+        rules.biscuit_bed.output,
         rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
