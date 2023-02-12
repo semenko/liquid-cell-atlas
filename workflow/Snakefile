@@ -28,7 +28,7 @@ DATA_PATH = "../data"
 data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Only operate on EM-seq files (ignore BS-seq)
 EMSEQ_ONLY = True
@@ -493,6 +493,7 @@ rule biscuit_bed:
     log:
         pileup="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-pileup.log.txt",
         vcf2bed="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-vcf2bed.log.txt",
+	mergecg="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-mergecg.log.txt",
     params:
         out_dir="{DATA_PATH}/{experiment}/{sample}/beds/",
         sample_str="{sample}",
@@ -502,8 +503,8 @@ rule biscuit_bed:
         """
         biscuit pileup -@ {threads} {input.masked_reference_genome} {input.bam} 2>{log.pileup} | \
         biscuit vcf2bed -k {params.minimum_reads} -t cg - 2>{log.vcf2bed} | \
-        LC_ALL=C sort -k1,1 -k2,2n | \
-        biscuit mergecg {input.masked_reference_genome} - | \
+        LC_ALL=C sort -S 5% -k1,1 -k2,2n | \
+        biscuit mergecg {input.masked_reference_genome} - 2>{log.mergecg} | \
         bgzip --compress-level 9 > {params.out_dir}/{params.sample_str}.bed.gz
 
         tabix -p bed {params.out_dir}/{params.sample_str}.bed.gz
