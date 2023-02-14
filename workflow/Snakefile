@@ -25,7 +25,7 @@ from snakemake.remote.HTTP import RemoteProvider as HTTPRemoteProvider
 DATA_PATH = "../data"
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -44,21 +44,40 @@ for filename in data_config_files:
     print(f"Parsing experiment: {experiment}", file=sys.stderr)
 
     # Load the .csv of our sample data
-    experiment_df = pd.read_table(filename, delimiter=",").set_index("sample_id", drop=False)
+    experiment_df = pd.read_table(filename, delimiter=",").set_index(
+        "sample_id", drop=False
+    )
 
     experiment_df["experiment"] = experiment
 
     # If these parameters aren't defined, drop the entry
     original_length = len(experiment_df)
-    experiment_df.dropna(subset=["experiment", "sample_id", "path_R1", "path_R2", "method", "md5sum_R1", "md5sum_R2"], inplace=True)
+    experiment_df.dropna(
+        subset=[
+            "experiment",
+            "sample_id",
+            "path_R1",
+            "path_R2",
+            "method",
+            "md5sum_R1",
+            "md5sum_R2",
+        ],
+        inplace=True,
+    )
     new_length = len(experiment_df)
 
     if original_length != new_length:
-        print(f"\tWarning: Ignoring {original_length-new_length} samples from experiment '{experiment}' that are missing required values.", file=sys.stderr)
+        print(
+            f"\tWarning: Ignoring {original_length-new_length} samples from experiment '{experiment}' that are missing required values.",
+            file=sys.stderr,
+        )
 
     if EMSEQ_ONLY:
         experiment_df = experiment_df[experiment_df["method"] == "emseq"]
-        print(f"\tNOTE: Filtering to {len(experiment_df)} EM-seq only samples.", file=sys.stderr)
+        print(
+            f"\tNOTE: Filtering to {len(experiment_df)} EM-seq only samples.",
+            file=sys.stderr,
+        )
 
     # If the subsampled flag is enabled, that means we're *operating* on subsampled data
     # (We're not making it -- it's made on regular / full runs.)
@@ -67,7 +86,9 @@ for filename in data_config_files:
         experiment_df["experiment"] = experiment + "_subsampled"
 
         # Note that subsampled data all have the same path data
-        experiment_df = experiment_df.assign(path_R1="R1.fastq.gz", path_R2="R2.fastq.gz")
+        experiment_df = experiment_df.assign(
+            path_R1="R1.fastq.gz", path_R2="R2.fastq.gz"
+        )
         # For subsampled reads, we've touch()'d the md5 validation file, so the pipeline will skip it.
         experiment_df = experiment_df.assign(md5sum_R1=None, md5sum_R2=None)
 
@@ -83,7 +104,17 @@ ALL_SAMPLES_LIST = []
 
 ## Select just the columns we want.
 # orient=records returns a list of dicts
-all_experiments_data = all_experiments_df[["experiment", "sample_id", "path_R1", "path_R2", "method", "md5sum_R1", "md5sum_R2"]].to_dict(orient="records")
+all_experiments_data = all_experiments_df[
+    [
+        "experiment",
+        "sample_id",
+        "path_R1",
+        "path_R2",
+        "method",
+        "md5sum_R1",
+        "md5sum_R2",
+    ]
+].to_dict(orient="records")
 
 print(f"Parsed {len(all_experiments_data)} total sample files.", file=sys.stderr)
 
@@ -98,12 +129,28 @@ ALL_SAMPLES_LIST.extend(all_experiments_data)
 rule all:
     input:
         # If you do NOT pass the subsampled flag, then we'll generate subsampled reads (from the full .fastq)
-        r1ss=[f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
-        r2ss=[f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R2.fastq.gz" for sample in ALL_SAMPLES_LIST] if "subsampled" not in config else [],
+        r1ss=[
+            f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz"
+            for sample in ALL_SAMPLES_LIST
+        ]
+        if "subsampled" not in config
+        else [],
+        r2ss=[
+            f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R2.fastq.gz"
+            for sample in ALL_SAMPLES_LIST
+        ]
+        if "subsampled" not in config
+        else [],
         # Each sub-job has a dependency logged here as
-        multiqc=[f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.pipeline-complete" for sample in ALL_SAMPLES_LIST],
+        multiqc=[
+            f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.pipeline-complete"
+            for sample in ALL_SAMPLES_LIST
+        ],
         # Run multiqc per-experiment as our ~last step
-        expt_multiqc=[f"{DATA_PATH}/{sample['experiment']}/multiqc/multiqc_report.html" for sample in ALL_SAMPLES_LIST],
+        expt_multiqc=[
+            f"{DATA_PATH}/{sample['experiment']}/multiqc/multiqc_report.html"
+            for sample in ALL_SAMPLES_LIST
+        ],
 
 
 ###############
@@ -124,7 +171,10 @@ rule get_reference_genome:
     input:
         # Not really ftp -- it's HTTPS/TLS
         reference_genome=ancient(
-            HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz", keep_local=True)
+            HTTPS.remote(
+                "ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_no_alt_plus_hs38d1_analysis_set.fna.gz",
+                keep_local=True,
+            )
         ),
     output:
         reference_genome="{DATA_PATH}/reference/GRCh38.fna",
@@ -140,8 +190,18 @@ rule mask_reference_fasta:
     conda:
         "envs/env.yaml"
     input:
-        u1af1_exclusion=ancient(HTTPS.remote("ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed", keep_local=True)),
-        dac_exclusion=ancient(HTTPS.remote("encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz", keep_local=True)),
+        u1af1_exclusion=ancient(
+            HTTPS.remote(
+                "ftp.ncbi.nlm.nih.gov/genomes/all/GCF/000/001/405/GCF_000001405.40_GRCh38.p14/GRCh38_major_release_seqs_for_alignment_pipelines/GCA_000001405.15_GRCh38_GRC_exclusions.bed",
+                keep_local=True,
+            )
+        ),
+        dac_exclusion=ancient(
+            HTTPS.remote(
+                "encode-public.s3.amazonaws.com/2020/05/05/bc5dcc02-eafb-4471-aba0-4ebc7ee8c3e6/ENCFF356LFX.bed.gz",
+                keep_local=True,
+            )
+        ),
         reference_genome=ancient(rules.get_reference_genome.output.reference_genome),  # Ancient ignores the mtime: if this file exists, assume we ran.
     output:
         masked_reference_genome="{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna",
@@ -170,7 +230,9 @@ rule biscuit_index:
     conda:
         "envs/env.yaml"
     input:
-        masked_reference_genome=ancient(rules.mask_reference_fasta.output.masked_reference_genome),
+        masked_reference_genome=ancient(
+            rules.mask_reference_fasta.output.masked_reference_genome
+        ),
     output:
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bis.amb",
         "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bis.ann",
@@ -192,7 +254,9 @@ rule biscuit_qc_index:
         "envs/env.yaml"  # TODO: Add perl for this? (bleh)
     input:
         biscuit_index=ancient(rules.biscuit_index.output),
-        masked_reference_genome=ancient(rules.mask_reference_fasta.output.masked_reference_genome),
+        masked_reference_genome=ancient(
+            rules.mask_reference_fasta.output.masked_reference_genome
+        ),
     output:
         "{DATA_PATH}/reference/biscuit_qc/cpg.bed.gz",
         "{DATA_PATH}/reference/biscuit_qc/windows100bp.gc_content.bot10p.bed.gz",
@@ -223,15 +287,21 @@ rule biscuit_qc_index:
 # This should NOT run on subsampled files
 rule md5sum:
     input:
-        r1_file=lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/" + all_experiments_df.loc[wildcards.sample, "path_R1"],
-        r2_file=lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/" + all_experiments_df.loc[wildcards.sample, "path_R2"],
+        r1_file=lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/"
+        + all_experiments_df.loc[wildcards.sample, "path_R1"],
+        r2_file=lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/"
+        + all_experiments_df.loc[wildcards.sample, "path_R2"],
     output:
         # We keep these in the raw directory to make it easier to reset/remove runs (rm everything except raw/)
         checksums="{DATA_PATH}/{experiment}/{sample}/raw/md5.known.txt",
         validated="{DATA_PATH}/{experiment}/{sample}/raw/md5.validated.txt",
     params:
-        r1_checksum=lambda wildcards: all_experiments_df.loc[wildcards.sample, "md5sum_R1"],
-        r2_checksum=lambda wildcards: all_experiments_df.loc[wildcards.sample, "md5sum_R2"],
+        r1_checksum=lambda wildcards: all_experiments_df.loc[
+            wildcards.sample, "md5sum_R1"
+        ],
+        r2_checksum=lambda wildcards: all_experiments_df.loc[
+            wildcards.sample, "md5sum_R2"
+        ],
         subsampled="subsampled" in config,
     threads: 25  # Bit of a hack: this is IO bound, try to throttle it a bit
     shell:
@@ -256,8 +326,12 @@ rule seqtk_subsample:
         r1_file_ss="{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R1.fastq.gz",
         r2_file_ss="{DATA_PATH}/{experiment}_subsampled/{sample}/raw/R2.fastq.gz",
         # We touch these to skip md5 validation on subsampled data
-        md5_known=touch("{DATA_PATH}/{experiment}_subsampled/{sample}/raw/md5.known.txt"),
-        md5_validated=touch("{DATA_PATH}/{experiment}_subsampled/{sample}/raw/md5.validated.txt"),
+        md5_known=touch(
+            "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/md5.known.txt"
+        ),
+        md5_validated=touch(
+            "{DATA_PATH}/{experiment}_subsampled/{sample}/raw/md5.validated.txt"
+        ),
     params:
         seed=4242,  # seed required for stable pairs
         reads=5000000,  # 5 million-per pair (10M total)
@@ -275,13 +349,21 @@ rule seqtk_subsample:
 
 # Trim poly-g if this is a two-color system
 def trim_poly_g(input):
-    with gzip.open(input.r1_file, "rt") as r1_in, gzip.open(input.r2_file, "rt") as r2_in:
+    with gzip.open(input.r1_file, "rt") as r1_in, gzip.open(
+        input.r2_file, "rt"
+    ) as r2_in:
         for line_r1, line_r2 in zip(r1_in, r2_in):
             line_r1_instrument = line_r1.split(":")[0]
             line_r2_instrument = line_r2.split(":")[0]
-            assert line_r1_instrument == line_r2_instrument, "R1 and R2 come from different instruments! Not possible."
+            assert (
+                line_r1_instrument == line_r2_instrument
+            ), "R1 and R2 come from different instruments! Not possible."
             break
-    return "--trim_poly_g" if line_r1_instrument.startswith(tuple(["@A0", "@NS", "@NB", "@VH"])) else ""
+    return (
+        "--trim_poly_g"
+        if line_r1_instrument.startswith(tuple(["@A0", "@NS", "@NB", "@VH"]))
+        else ""
+    )
 
 
 ### fastp
@@ -297,10 +379,18 @@ rule fastp:
         r1_file=rules.md5sum.input.r1_file,
         r2_file=rules.md5sum.input.r2_file,
     output:
-        fastp_pipe_output=temp(pipe("{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa")),
+        fastp_pipe_output=temp(
+            pipe("{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa")
+        ),
         fastp_failed="{DATA_PATH}/{experiment}/{sample}/fastp/failed.fa.gz",  # Length < 15
-        fastp_json=ensure("{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.json", non_empty=True),
-        fastp_html=ensure("{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.html", non_empty=True),
+        fastp_json=ensure(
+            "{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.json",
+            non_empty=True,
+        ),
+        fastp_html=ensure(
+            "{DATA_PATH}/{experiment}/{sample}/fastp/{sample}.fastp.html",
+            non_empty=True,
+        ),
     log:
         fastp_err="{DATA_PATH}/{experiment}/{sample}/logs/fastp.log.txt",
     threads: 3  # Three threads is apparently the default.
@@ -408,7 +498,10 @@ rule samtools_fixmate_sort_markdup:
         reference_genome=rules.mask_reference_fasta.output.masked_reference_genome,
     output:
         bam=protected("{DATA_PATH}/{experiment}/{sample}/{sample}.bam"),
-        stats_file=ensure("{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.markdup.txt", non_empty=True),
+        stats_file=ensure(
+            "{DATA_PATH}/{experiment}/{sample}/samtools/{sample}.markdup.txt",
+            non_empty=True,
+        ),
     log:
         fixmate="{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt",
         sort="{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt",
@@ -485,7 +578,9 @@ rule biscuit_bed:
         "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
-        masked_reference_genome=ancient(rules.mask_reference_fasta.output.masked_reference_genome),
+        masked_reference_genome=ancient(
+            rules.mask_reference_fasta.output.masked_reference_genome
+        ),
         index=rules.samtools_index.output,
     output:
         bed="{DATA_PATH}/{experiment}/{sample}/beds/{sample}.bed.gz",
@@ -493,7 +588,7 @@ rule biscuit_bed:
     log:
         pileup="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-pileup.log.txt",
         vcf2bed="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-vcf2bed.log.txt",
-	mergecg="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-mergecg.log.txt",
+        mergecg="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-mergecg.log.txt",
     params:
         out_dir="{DATA_PATH}/{experiment}/{sample}/beds/",
         sample_str="{sample}",
@@ -523,7 +618,9 @@ rule biscuit_epiread:
         "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
-        masked_reference_genome=ancient(rules.mask_reference_fasta.output.masked_reference_genome),
+        masked_reference_genome=ancient(
+            rules.mask_reference_fasta.output.masked_reference_genome
+        ),
         index=rules.samtools_index.output,
     output:
         "{DATA_PATH}/{experiment}/{sample}/epibeds/{sample}.epibed.gz",
@@ -549,7 +646,9 @@ rule biscuit_qc:
         "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
-        masked_reference_genome=ancient(rules.mask_reference_fasta.output.masked_reference_genome),
+        masked_reference_genome=ancient(
+            rules.mask_reference_fasta.output.masked_reference_genome
+        ),
         biscuit_qc_index=rules.biscuit_qc_index.output.path,
         index=rules.samtools_index.output,
     output:
@@ -666,8 +765,12 @@ rule multiqc:
 
 # nfty.sh push for the whole job
 onsuccess:
-    shell('curl -H "Title: Success" -H "Tags: tada" -d "Job complete on $HOSTNAME" ntfy.sh/semenko-snakemake')
+    shell(
+        'curl -H "Title: Success" -H "Tags: tada" -d "Job complete on $HOSTNAME" ntfy.sh/semenko-snakemake'
+    )
 
 
 onerror:
-    shell('curl -H "Title: Failure" -H "Tags: warning" -d "Job failure on $HOSTNAME" ntfy.sh/semenko-snakemake')
+    shell(
+        'curl -H "Title: Failure" -H "Tags: warning" -d "Job failure on $HOSTNAME" ntfy.sh/semenko-snakemake'
+    )
