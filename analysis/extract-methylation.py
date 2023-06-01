@@ -101,7 +101,7 @@ def get_cpg_sites_from_fasta(reference_fasta, chromosomes, verbose=False, skip_c
     return cpg_sites_dict
 
 
-def get_windowed_cpg_sites(reference_fasta, window_size, chromosomes, verbose=False, skip_cache=False):
+def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose=False, skip_cache=False):
     """
     Generate a dict of CpG sites for each chromosome in the reference genome.
 
@@ -114,7 +114,6 @@ def get_windowed_cpg_sites(reference_fasta, window_size, chromosomes, verbose=Fa
     Args:
         reference_fasta (str): Path to the reference genome .fa file.
         window_size (int): Size of the window to use.
-        chromosomes (list): List of chromosomes to include.
         verbose (bool): Print verbose output.
         skip_cache (bool): Ignore any cached files (slow!).
     Returns:
@@ -145,15 +144,9 @@ def get_windowed_cpg_sites(reference_fasta, window_size, chromosomes, verbose=Fa
     # TODO: Shrink read size a little to account for trimming?
     assert 10 < window_size < 500, "Read size is atypical, please double check (only validated for ~150 bp.)"
 
-    # We need to obtain all cpg sites in the reference genome
-    # NOTE: This can take a while (~10 minutes for GRCh38 if not cached)
-    cpg_sites_dict = get_cpg_sites_from_fasta(reference_fasta=reference_fasta,
-                                              chromosomes=chromosomes,
-                                              verbose=verbose,
-                                              skip_cache=skip_cache)
-
     if verbose:
         print(f'\n\tGenerating windowed CpG sites dict (window size = {window_size} bp.)\n')
+
     # This is a dict of lists, where but each list contains a tuple of CpG ranges witin a window
     # The key is the chromosome: e.g. "chr1"
     # The value is a list of tuples: e.g. [(0,35), (190,212), (1055,)]
@@ -201,8 +194,68 @@ def get_windowed_cpg_sites(reference_fasta, window_size, chromosomes, verbose=Fa
 
     return windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse
 
+# TODO: Object orient this input / simplify the input?
+def embedding_to_genomic_position(chromosomes, total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, embedding_pos):
+    """
+    Given an embedding position, return the chromosome and position.
 
-def extract_methylation_data_from_bam(input_bam, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False, paranoid=False):
+    Parameters
+    ----------
+    embedding_pos : int
+        The embedding position.
+
+    Returns
+    -------
+    chr : str
+        The chromosome.
+    pos : int
+        The position.
+    """
+    assert embedding_pos >= 0 and embedding_pos < total_cpg_sites
+
+    # Find the index of the first element in cpgs_per_chr_cumsum that is greater than or equal to the embedding position
+    chr_index = np.searchsorted(cpgs_per_chr_cumsum, embedding_pos+1, side="left")
+
+    # Now we know the chromosome, but we need to find the position within the chromosome
+    # If this is the first chromosome, the position is just the embedding position
+    if chr_index == 0:
+        return chromosomes[chr_index], cpg_sites_dict[chromosomes[chr_index]][embedding_pos]
+    # Otherwise, subtract the length of the previous chromosomes from the embedding position
+    embedding_pos -= cpgs_per_chr_cumsum[chr_index-1]
+    return chromosomes[chr_index], cpg_sites_dict[chromosomes[chr_index]][embedding_pos]
+
+
+# TODO: Object orient this input / simplify the input?
+def genomic_position_to_embedding(chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, chrom, pos):
+    """
+    Given a genomic position, return the embedding position.
+
+    Parameters
+    ----------
+    chrom : str
+        The chromosome.
+    pos : int
+        The position.
+
+    Returns
+    -------
+    embedding_pos : int
+        The embedding position.
+    """
+    assert chrom in chromosomes
+    
+    # Find the index of the chromosome
+    chr_index = chromosomes.index(chrom)
+    # Find the index of the CpG site in the chromosome
+    cpg_index = cpg_sites_dict[chrom].index(pos)
+    # If this is the first chromosome, the embedding position is just the CpG index
+    if chr_index == 0:
+        return cpg_index
+    # Otherwise, add the length of the previous chromosomes to the CpG index
+    return cpg_index + cpgs_per_chr_cumsum[chr_index-1]
+
+
+def extract_methylation_data_from_bam(input_bam, chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False, paranoid=False):
     """
     Extract methylation data from a .bam file.
     
@@ -322,7 +375,9 @@ def extract_methylation_data_from_bam(input_bam, windowed_cpg_sites_dict, window
                     coo_row.append(next_coo_row_number)
                     # instead of ref_pos, we want the index of the CpG in the list of CpGs
                     # coo_col.append(ref_pos)
-                    coo_col.append(genomic_position_to_embedding(chrom, ref_pos+1))
+
+                    # TODO: Object orient these inputs? -- lots of bad inheritence style here
+                    coo_col.append(genomic_position_to_embedding(chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, chrom, ref_pos+1))
                     #coo_data.append(1 if query_base == "C" else 0)
                     if query_base == "C":
                         # Methylated
@@ -346,7 +401,7 @@ def extract_methylation_data_from_bam(input_bam, windowed_cpg_sites_dict, window
 
     # COO THIS?
 
-    
+
     return False
 
 def main():
@@ -397,6 +452,9 @@ def main():
         print(f'Reference fasta: {reference_fasta}')
         print(f'Output file: {output_file}')
 
+    # Check if the input file exists & readable
+    assert os.access(input_bam, os.R_OK), f"Input file is not readable: {input_bam}"
+
     # Check if the output file exists
     if os.path.exists(output_file):
         if args.overwrite:
@@ -409,13 +467,51 @@ def main():
 
     chromosomes = ["chr" + str(i) for i in range(1, 23)] + ["chrX", "chrY"]
 
+    # We need to obtain all cpg sites in the reference genome
+    # NOTE: This can take a while (~10 minutes for GRCh38 if not cached)
+    cpg_sites_dict = get_cpg_sites_from_fasta(reference_fasta=reference_fasta,
+                                              chromosomes=chromosomes,
+                                              verbose=verbose,
+                                              skip_cache=skip_cache)
+
+    # How many CpG sites are there?
+    total_cpg_sites = sum([len(v) for v in cpg_sites_dict.values()])
+    if verbose:
+        print(f"Total CpG sites: {total_cpg_sites:,}")
+
+    assert(total_cpg_sites>28_000_000) # Validity check for hg38
+
+    # Count the number of CpGs per chromosome
+    cpgs_per_chr = {k: len(v) for k, v in cpg_sites_dict.items()}
+
+    # Add up the number of CpGs per chromosome, e.g. chr1, then chr1+chr2, then chr1+chr2+chr3, etc
+    cpgs_per_chr_cumsum = np.cumsum([cpgs_per_chr[k] for k in chromosomes])
+
+
+    # TODO: Move these into to a formal test framework
+    # TODO: Simplify the input framework (object orient the window / cpg dict?)
+    ### Tests
+    assert cpgs_per_chr_cumsum[-1] == total_cpg_sites
+    assert embedding_to_genomic_position(chromosomes, total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, 0) == ("chr1", cpg_sites_dict["chr1"][0])
+    assert embedding_to_genomic_position(chromosomes, total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, 1) == ("chr1", cpg_sites_dict["chr1"][1])
+    # Edges
+    assert embedding_to_genomic_position(chromosomes, total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, cpgs_per_chr_cumsum[0]) == ("chr2", cpg_sites_dict["chr2"][0])
+    assert embedding_to_genomic_position(chromosomes, total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, cpgs_per_chr_cumsum[-1]-1) == ("chrY", cpg_sites_dict["chrY"][-1])
+    ### Tests
+    assert genomic_position_to_embedding(chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, "chr1", cpg_sites_dict["chr1"][0]) == 0
+    assert genomic_position_to_embedding(chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, "chr1", cpg_sites_dict["chr1"][1]) == 1
+    # Edges
+    assert genomic_position_to_embedding(chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, "chr2", cpg_sites_dict["chr2"][0]) == cpgs_per_chr_cumsum[0]
+    assert genomic_position_to_embedding(chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, "chrY", cpg_sites_dict["chrY"][-1]) == cpgs_per_chr_cumsum[-1]-1
+    ########
+
     # Get our windowed_cpg_sites, hopefully cached!
     if verbose:
         print('\nLoading (or generating) windowed CpG sites for reference genome.')
 
     windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse = get_windowed_cpg_sites(reference_fasta=reference_fasta,
+                                                                                      cpg_sites_dict=cpg_sites_dict,
                                                                                       window_size=window_size,
-                                                                                      chromosomes=chromosomes,
                                                                                       verbose=verbose,
                                                                                       skip_cache=skip_cache)
     
@@ -425,6 +521,7 @@ def main():
         print(f'\nExtracting methylation data from: {input_bam}')
 
     methylation_data = extract_methylation_data_from_bam(input_bam=input_bam,
+                                                         chromosomes=chromosomes, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, # TODO: simlify these inputs
                                                          windowed_cpg_sites_dict=windowed_cpg_sites_dict,
                                                          windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse,
                                                          quality_limit=quality_limit,
