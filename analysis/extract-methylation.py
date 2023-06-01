@@ -47,7 +47,7 @@ def get_cpg_sites_from_fasta(reference_fasta, chromosomes, verbose=False, skip_c
         cpg_sites_dict (dict): A dict of CpG sites for each chromosome in the reference genome.
     """
     # TODO: Store hash/metadata / reference file info, etc.?
-    cached_cpg_sites_json = os.path.splitext(reference_fasta)[0] + "cpg_all_sites.json"
+    cached_cpg_sites_json = os.path.splitext(reference_fasta)[0] + ".cpg_all_sites.json"
 
     if verbose:
         print(f"\tLoading all CpG sites for: {reference_fasta}")
@@ -132,7 +132,8 @@ def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose
         with open(windowed_cpg_sites_cache, "r", encoding='utf-8') as f:
             windowed_cpg_sites_dict = json.load(f)
         with open(windowed_cpg_sites_reverse_cache, "r", encoding='utf-8') as f:
-            windowed_cpg_sites_dict_reverse = json.load(f)
+            # This object_hook is to convert the keys back to integers, since JSON only supports strings as keys
+            windowed_cpg_sites_dict_reverse = json.load(f, object_hook=lambda d: {int(k) if k.isdigit() else k: v for k, v in d.items()})
 
         return windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse
 
@@ -190,7 +191,6 @@ def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose
         json.dump(windowed_cpg_sites_dict, f)
     with open(windowed_cpg_sites_reverse_cache, "w", encoding='utf-8') as f:
         json.dump(windowed_cpg_sites_dict_reverse, f)
-
 
     return windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse
 
@@ -284,8 +284,7 @@ def extract_methylation_data_from_bam(input_bam, chromosomes, cpg_sites_dict, cp
     DEBUG = False
 
     # This is slow, but we only run it once and store the results for later
-    # TODO: tqdm if needed? none?
-    for chrom, windowed_cpgs in tqdm(windowed_cpg_sites_dict.items()):
+    for chrom, windowed_cpgs in tqdm(windowed_cpg_sites_dict.items(), disable=not verbose):
         for start_pos, stop_pos in windowed_cpgs:
             cpgs_within_window = windowed_cpg_sites_dict_reverse[chrom][start_pos]
             if DEBUG: print(f"\tPosition: {start_pos} - {stop_pos}")
@@ -516,12 +515,14 @@ def main():
                                                                                       skip_cache=skip_cache)
     
 
+    print(list(windowed_cpg_sites_dict_reverse['chr1'].keys())[:10])
+
     # Extract methylation data
     if verbose:
         print(f'\nExtracting methylation data from: {input_bam}')
 
     methylation_data = extract_methylation_data_from_bam(input_bam=input_bam,
-                                                         chromosomes=chromosomes, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, # TODO: simlify these inputs
+                                                         chromosomes=chromosomes, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, # TODO: simplify these inputs
                                                          windowed_cpg_sites_dict=windowed_cpg_sites_dict,
                                                          windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse,
                                                          quality_limit=quality_limit,
