@@ -21,9 +21,9 @@ import sys
 import time
 
 # Third party modules
-#import numpy as np
-#import pysam
-# from scipy.sparse import coo_matrix
+import numpy as np
+import pysam
+from scipy.sparse import coo_matrix
 from tqdm import tqdm
 
 # We use SeqIO to parse the reference .fa file
@@ -202,8 +202,151 @@ def get_windowed_cpg_sites(reference_fasta, window_size, chromosomes, verbose=Fa
     return windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse
 
 
-def extract_methylation_data_from_bam(input_bam, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False):
+def extract_methylation_data_from_bam(input_bam, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False, paranoid=False):
+    """
+    Extract methylation data from a .bam file.
+    
+    Args:
 
+    """
+    input_bam_object = pysam.AlignmentFile(input_bam, "rb", require_index=True, threads=1)
+    
+    if verbose:
+        print(f'\tExtracting methylation data from: {input_bam}')
+        print(f'\t\tTotal reads: {input_bam_object.mapped}')
+
+    # Temporary storage for loading into a COO matrix
+    # For a COO, we want three lists:
+    # row: the read number (we'll store a read name -> ID dict perhaps?)
+    # column: cpg #
+    # data: methylation state (1 [methylated], -1 [unmethylated], and 0 [no data])
+    next_coo_row_number = 0
+    read_name_to_row_number = {}
+
+    # TODO: Modularize/clean?
+    coo_row = []
+    coo_col = []
+    coo_data = []
+
+    DEBUG = False
+
+    # This is slow, but we only run it once and store the results for later
+    # TODO: tqdm if needed? none?
+    for chrom, windowed_cpgs in tqdm(windowed_cpg_sites_dict.items()):
+        for start_pos, stop_pos in windowed_cpgs:
+            cpgs_within_window = windowed_cpg_sites_dict_reverse[chrom][start_pos]
+            if DEBUG: print(f"\tPosition: {start_pos} - {stop_pos}")
+            if DEBUG: print(f"\tCovered CpGs: {cpgs_within_window}")
+            # cpgs_within_window = [10469]
+            # This returns an AlignmentSegment object from PySam
+            for aligned_segment in input_bam_object.fetch(contig=chrom, start=start_pos, end=stop_pos):
+                if aligned_segment.mapping_quality < quality_limit:
+                    # if DEBUG: print(f"Skipping read {aligned_segment.query_name} with MAPQ {aligned_segment.mapping_quality} < {QUALITY_THRESHOLD}")
+                    continue
+
+                if aligned_segment.is_duplicate:
+                    continue
+                if aligned_segment.is_qcfail:
+                    continue
+                if aligned_segment.is_secondary:
+                    continue
+
+                if DEBUG: print(aligned_segment)
+
+                if paranoid:
+                    # Validity tests
+                    assert aligned_segment.is_mapped
+                    assert aligned_segment.is_supplementary is False
+                    assert aligned_segment.reference_start <= stop_pos
+                    assert aligned_segment.reference_end >= start_pos
+                    assert aligned_segment.query_alignment_sequence == aligned_segment.get_forward_sequence()
+
+                    # Ensure alignment methylation tags exist
+                    assert aligned_segment.has_tag("XB") # GEM3/Blueprint may add this (also in Biscuit, but different!)
+                    assert aligned_segment.has_tag("MD") # Location of mismatches (methylation)
+                    assert aligned_segment.has_tag("YD") # Bisulfite conversion strand label (f: OT/CTOT C->T or r: OB/CTOB G->A)
+
+                # TODO: We ignore paired/unpaired read status for now, and treat them the same
+                # Should we treat paired reads / overlapping reads differently?
+
+                bisulfite_parent_strand_is_reverse = None
+                if aligned_segment.has_tag("YD"): # Biscuit tag
+                    yd_tag = aligned_segment.get_tag("YD")
+                    if yd_tag == "f": # Forward = C→T
+                        # This read derives from OT/CTOT strand: C->T substitutions matter (C = methylated, T = unmethylated),
+                        bisulfite_parent_strand_is_reverse = False
+                    elif yd_tag == "r": # Reverse = G→A
+                        # This read derives from the OB/CTOB strand: G->A substitutions matter (G = methylated, A = unmethylated)
+                        bisulfite_parent_strand_is_reverse = True
+                elif aligned_segment.has_tag("XB"): # gem3 / blueprint tag
+                    raise NotImplementedError("XB tag not validated yet")
+                    xb_tag = aligned_segment.get_tag("XB") # XB:C = Forward / Reference was CG
+                    # TODO: Double check one or two of these gem3 tags manually.
+                    if xb_tag == "C":
+                        bisulfite_parent_strand_is_reverse = False
+                    elif xb_tag == "G": # XB:G = Reverse / Reference was GA
+                        bisulfite_parent_strand_is_reverse = True
+
+                # TODO: Think about this old note of mine -- is this correct?
+                # We have paired-end reads; one half should (the "parent strand") has the methylation data.
+                # The other half (the "daughter strand") was the complement created by PCR, which we don't care about.
+                if bisulfite_parent_strand_is_reverse != aligned_segment.is_reverse:
+                    # Skip if we're not on the bisulfite-converted parent strand.
+                    if DEBUG: print(f"\t\t Not on methylated strand, skipping: {aligned_segment.query_name}")
+                    continue
+
+                # get_aligned_pairs returns a list of tuples of (read_pos, ref_pos)
+                # We filter this to only include the specific CpG sites from above
+                this_segment_cpgs = [e for e in aligned_segment.get_aligned_pairs(matches_only=True) if e[1]+1 in cpgs_within_window]
+
+                # Ok we're on the same strand as the methylation (right?)
+                # Let's compare the possible CpGs in this interval to the reference and note status
+                #   A methylated C will be *unchanged* and read as C (pair G)
+                #   An unmethylated C will be *changed* and read as T (pair A)
+                if DEBUG: print(f"bisulfite_parent_strand_is_reverse: {bisulfite_parent_strand_is_reverse}")
+                for query_pos, ref_pos in this_segment_cpgs:
+                    query_base = aligned_segment.query_sequence[query_pos]
+                    query_base2 = aligned_segment.get_forward_sequence()[query_pos]
+                    query_base3 = aligned_segment.query_alignment_sequence[query_pos]
+                    assert query_base == query_base2
+                    assert query_base == query_base3
+                    #ref_base = aligned_segment.get_reference_sequence()[ref_pos - aligned_segment.reference_start]
+                    #assert ref_base.upper() == "C", f"Expected C at {ref_pos} but got {ref_base}"
+                    # print(f"\t{query_pos} {ref_pos} {query_base} {query_base2} {query_base3} {ref_base}")
+                    # print(f"\t{query_pos} {ref_pos} C->{query_base}")
+                    # If query == reference, we're methylated.
+                    # If query !== reference, we're unmethylated.
+                    # NOTE: there's an edge where if query != reference AND query == random base, we're an SNV
+
+                    # Store in our sparse array
+                    coo_row.append(next_coo_row_number)
+                    # instead of ref_pos, we want the index of the CpG in the list of CpGs
+                    # coo_col.append(ref_pos)
+                    coo_col.append(genomic_position_to_embedding(chrom, ref_pos+1))
+                    #coo_data.append(1 if query_base == "C" else 0)
+                    if query_base == "C":
+                        # Methylated
+                        coo_data.append(1)
+                        if DEBUG: print(f"\t\tMethylated")
+                    elif query_base == "T":
+                        coo_data.append(0)
+                        # Unmethylated
+                        if DEBUG: print(f"\t\tUnmethylated")
+                    else:
+                        coo_data.append(-1) # or just 0?
+                        if DEBUG: print(f"\t\tUnknown!")
+                        # raise ValueError(f"Unexpected query base {query_base} at {query_pos} {ref_pos}")
+
+                read_name_to_row_number[aligned_segment.query_name] = next_coo_row_number
+                next_coo_row_number += 1
+                if DEBUG: print("************************************************\n")
+
+                #query_bp = aligned_segment.query_sequence[pileupread.query_position]
+                #reference_bp = aligned_segment.get_reference_sequence()[aligned_segment.reference_start - pileupcolumn.reference_pos].upper()
+
+    # COO THIS?
+
+    
     return False
 
 def main():
@@ -229,6 +372,7 @@ def main():
     parser.add_argument('--window-size', help='Window size (default = 150)', default=150, type=int)
     parser.add_argument('--verbose', help='Verbose output.', action='store_true')
     parser.add_argument('--skip-cache', help='De-novo generate CpG sites (slow).', action='store_true')
+    parser.add_argument('--paranoid', help='Paranoid mode (extensive validity checking).', action='store_true')
     parser.add_argument('--output-file', help='Output file. Default is to use the input file name with a .methylation.npy extension.', default=None)
     parser.add_argument('--overwrite', help='Overwrite output file if it exists.', action='store_true')
 
@@ -239,6 +383,7 @@ def main():
     verbose = args.verbose
     quality_limit = args.quality_limit
     skip_cache = args.skip_cache
+    paranoid = args.paranoid
     output_file = args.output_file
     window_size = args.window_size
 
@@ -283,7 +428,8 @@ def main():
                                                          windowed_cpg_sites_dict=windowed_cpg_sites_dict,
                                                          windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse,
                                                          quality_limit=quality_limit,
-                                                         verbose=verbose)
+                                                         verbose=verbose,
+                                                         paranoid=paranoid)
     
     # Write methylation data to a COO sparse matrix
     if verbose:
