@@ -255,7 +255,10 @@ def genomic_position_to_embedding(chromosomes, cpg_sites_dict, cpgs_per_chr_cums
     return cpg_index + cpgs_per_chr_cumsum[chr_index-1]
 
 
-def extract_methylation_data_from_bam(input_bam, chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False, paranoid=False):
+def extract_methylation_data_from_bam(input_bam, total_cpg_sites,
+                                      chromosomes, cpg_sites_dict, cpgs_per_chr_cumsum,
+                                      windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse,
+                                      quality_limit=0, verbose=False, paranoid=False):
     """
     Extract methylation data from a .bam file.
     
@@ -398,10 +401,7 @@ def extract_methylation_data_from_bam(input_bam, chromosomes, cpg_sites_dict, cp
                 #query_bp = aligned_segment.query_sequence[pileupread.query_position]
                 #reference_bp = aligned_segment.get_reference_sequence()[aligned_segment.reference_start - pileupcolumn.reference_pos].upper()
 
-    # COO THIS?
-
-
-    return False
+    return coo_matrix((coo_data, (coo_row, coo_col)), shape=(len(read_name_to_row_number), total_cpg_sites)).toarray()
 
 def main():
     """
@@ -517,27 +517,26 @@ def main():
 
     print(list(windowed_cpg_sites_dict_reverse['chr1'].keys())[:10])
 
-    # Extract methylation data
+    # Extract methylation data as a COO sparse matrix
     if verbose:
         print(f'\nExtracting methylation data from: {input_bam}')
 
-    methylation_data = extract_methylation_data_from_bam(input_bam=input_bam,
+    methylation_data_coo = extract_methylation_data_from_bam(input_bam=input_bam,
+                                                             total_cpg_sites=total_cpg_sites,
                                                          chromosomes=chromosomes, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, # TODO: simplify these inputs
                                                          windowed_cpg_sites_dict=windowed_cpg_sites_dict,
                                                          windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse,
                                                          quality_limit=quality_limit,
                                                          verbose=verbose,
                                                          paranoid=paranoid)
+
+    assert(len(methylation_data_coo[0]) == total_cpg_sites)
     
-    # Write methylation data to a COO sparse matrix
     if verbose:
         print(f'\nWriting methylation data to: {output_file}')
 
-    #write_methylation_data(methylation_data=methylation_data,
-    #                       output_file=output_file,
-    #                       verbose=verbose,
-    #                       paranoid=paranoid)
-    
+    # Save the matrix, which is an ndarray of shape (n_reads, n_cpgs), to a file
+    np.save(output_file, methylation_data_coo, allow_pickle=True)
 
     # Report performance time
     if verbose:
