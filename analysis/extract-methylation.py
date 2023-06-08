@@ -415,11 +415,11 @@ def main():
     Our main function. Call argparse and whatnot.
 
     Options are:
-    --input-bam: Input .bam file to process.
+    --input-path: Input .bam file OR directory to recursively process.
     --reference-fasta: Reference genome fasta file (critical to determine CpG sites).
     --verbose: Verbose output.
     --paranoid: Paranoid mode (extensive validity checking).
-    --output-file: Output file. Default is to use the input file name with a .methylation.npy extension.
+    # --output-file: Output file. Default is to use the extension .methylation.npz. (Only available for single .bam file input.)
     --overwrite: Overwrite output file if it exists.
 
     Returns: Nothing.
@@ -427,49 +427,69 @@ def main():
 
     # Let's do our argparse stuff
     parser = argparse.ArgumentParser(description="Extract read-level methylation data from an aligned .bam file and store as a numpy array.")
-    parser.add_argument("--input-bam", help="Input .bam file to process.", required=True)
+    parser.add_argument("--input-path", help="Input .bam file OR directory to recursively process.", required=True)
     parser.add_argument("--reference-fasta", help="Reference genome fasta file (critical to determine CpG sites).", required=True)
     parser.add_argument("--quality-limit", help="Quality filter for aligned reads (default = 20)", default=20, type=int)
     parser.add_argument("--window-size", help="Window size (default = 150)", default=150, type=int)
     parser.add_argument("--verbose", help="Verbose output.", action="store_true")
     parser.add_argument("--skip-cache", help="De-novo generate CpG sites (slow).", action="store_true")
     parser.add_argument("--paranoid", help="Paranoid mode (extensive validity checking).", action="store_true")
-    parser.add_argument("--output-file", help="Output file. Default is to use the input file name with a .methylation.npy extension.", default=None)
+    # parser.add_argument("--output-file", help="Output file. Default is to use the extension .methylation.npz. (Only available for single .bam file input.)", default=None)
     parser.add_argument("--overwrite", help="Overwrite output file if it exists.", action="store_true")
 
     # Parse the arguments & set up some variables
     args = parser.parse_args()
-    input_bam = args.input_bam
+    input_path = args.input_path
     reference_fasta = args.reference_fasta
     verbose = args.verbose
     quality_limit = args.quality_limit
     skip_cache = args.skip_cache
     paranoid = args.paranoid
-    output_file = args.output_file
+    # output_file = args.output_file
     window_size = args.window_size
-
-    if args.output_file is None:
-        output_file = os.path.splitext(input_bam)[0] + ".methylation.npz"
 
     time_start = time.time()
     # Print run information
     if verbose:
-        print(f"Input bam: {input_bam}")
         print(f"Reference fasta: {reference_fasta}")
-        print(f"Output file: {output_file}")
+        print(f"Input path: {input_path}")
 
-    # Check if the input file exists & readable
-    assert os.access(input_bam, os.R_OK), f"Input file is not readable: {input_bam}"
+    # Check if input_path is a file or a directory
+    if os.path.isfile(input_path):
+        bams_to_process = [input_path]
+    elif os.path.isdir(input_path):
+        # Recursively find all .bam files in this path, and add them to a list
+        bams_to_process = []
+        for root, _, files in os.walk(input_path):
+            for file in files:
+                if file.endswith(".bam"):
+                    bams_to_process.append(os.path.join(root, file))
+    else:
+        raise ValueError(f"Input path {input_path} is not a file or a directory.")
 
-    # Check if the output file exists
-    if os.path.exists(output_file):
-        if args.overwrite:
-            if verbose:
-                print("\tOutput file exists and --overwrite specified. Overwriting.")
-            assert os.access(output_file, os.W_OK), f"Output file is not writable: {output_file}"
+    if verbose:
+        print(f"Found {len(bams_to_process)} .bam file(s) to process.")
+       
+    #if args.output_file is None:
+    #    output_file = os.path.splitext(input_bam)[0] + ".methylation.npz"
+
+    # Check input/output validity
+    for bam_file in bams_to_process:
+        assert os.access(bam_file, os.R_OK), f"Input file is not readable: {bam_file}"
+
+        output_file = os.path.splitext(bam_file)[0] + ".methylation.npz"
+        # Check if the output files exist or are writable
+        if os.path.exists(output_file):
+            if args.overwrite:
+                if verbose:
+                    print(f"\tOutput file exists and --overwrite specified. Will overwrite: {output_file}")
+                assert os.access(output_file, os.W_OK), f"Output file is not writable: {output_file}"
+            else:
+                print(f"Exiting. An output file exists and --overwrite not specified: {output_file}")
+                sys.exit(1)
+        # Otherwise, check the path is writable
         else:
-            print("\tOutput file exists and --overwrite not specified. Exiting.")
-            sys.exit(1)
+            assert os.access(os.path.dirname(output_file), os.W_OK), f"Output file path is not writable: {output_file}"
 
     chromosomes = ["chr" + str(i) for i in range(1, 23)] + ["chrX", "chrY"]
 
@@ -491,7 +511,7 @@ def main():
     cpgs_per_chr_cumsum = np.cumsum([cpgs_per_chr[k] for k in chromosomes])
 
     # TODO: Move these into to a formal test framework
-    # TODO: Simplify the input framework (object orient the window / cpg dict?)
+    # TODO: Simplify the input framework (likely object orient the window / cpg dict?)
     ### Tests
     assert cpgs_per_chr_cumsum[-1] == total_cpg_sites
     assert embedding_to_genomic_position(chromosomes, total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, 0) == ("chr1", cpg_sites_dict["chr1"][0])
@@ -513,19 +533,28 @@ def main():
 
     windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse = get_windowed_cpg_sites(reference_fasta=reference_fasta, cpg_sites_dict=cpg_sites_dict, window_size=window_size, verbose=verbose, skip_cache=skip_cache)
 
-    # Extract methylation data as a COO sparse matrix
-    if verbose:
-        print(f"\nExtracting methylation data from: {input_bam}")
 
-    methylation_data_coo = extract_methylation_data_from_bam(input_bam=input_bam, total_cpg_sites=total_cpg_sites, chromosomes=chromosomes, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, windowed_cpg_sites_dict=windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse, quality_limit=quality_limit, verbose=verbose, paranoid=paranoid)  # TODO: simplify these inputs
+    #################################################
+    # Operate over the input BAM files
+    #################################################
 
-    assert len(methylation_data_coo.toarray()[0]) == total_cpg_sites
+    for i, input_bam in enumerate(bams_to_process):
+        output_file = os.path.splitext(input_bam)[0] + ".methylation.npz"
+        # Extract methylation data as a COO sparse matrix
+        if verbose:
+            print("\n" + "=" * 80)
+            print(f"Processing BAM file {i+1} of {len(bams_to_process)}")
+            print(f"\nExtracting methylation data from: {input_bam}")
 
-    if verbose:
-        print(f"\nWriting methylation data to: {output_file}")
+        methylation_data_coo = extract_methylation_data_from_bam(input_bam=input_bam, total_cpg_sites=total_cpg_sites, chromosomes=chromosomes, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, windowed_cpg_sites_dict=windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse, quality_limit=quality_limit, verbose=verbose, paranoid=paranoid)  # TODO: simplify these inputs
 
-    # Save the matrix, which is an ndarray of shape (n_reads, n_cpgs), to a file
-    scipy.sparse.save_npz(output_file, methylation_data_coo, compressed=True)
+        assert len(methylation_data_coo.toarray()[0]) == total_cpg_sites
+
+        if verbose:
+            print(f"\nWriting methylation data to: {output_file}")
+
+        # Save the matrix, which is an ndarray of shape (n_reads, n_cpgs), to a file
+        scipy.sparse.save_npz(output_file, methylation_data_coo, compressed=True)
 
     # Report performance time
     if verbose:
