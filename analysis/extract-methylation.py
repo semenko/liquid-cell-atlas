@@ -23,7 +23,7 @@ import time
 # Third party modules
 import numpy as np
 import pysam
-from scipy.sparse import coo_matrix
+import scipy.sparse
 from tqdm import tqdm
 
 # We use SeqIO to parse the reference .fa file
@@ -407,7 +407,7 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chromosomes, c
                 # query_bp = aligned_segment.query_sequence[pileupread.query_position]
                 # reference_bp = aligned_segment.get_reference_sequence()[aligned_segment.reference_start - pileupcolumn.reference_pos].upper()
 
-    return coo_matrix((coo_data, (coo_row, coo_col)), shape=(len(read_name_to_row_number), total_cpg_sites)).toarray()
+    return scipy.sparse.coo_matrix((coo_data, (coo_row, coo_col)), shape=(len(read_name_to_row_number), total_cpg_sites))
 
 
 def main():
@@ -449,7 +449,7 @@ def main():
     window_size = args.window_size
 
     if args.output_file is None:
-        output_file = os.path.splitext(input_bam)[0] + ".methylation.npy"
+        output_file = os.path.splitext(input_bam)[0] + ".methylation.npz"
 
     time_start = time.time()
     # Print run information
@@ -519,13 +519,13 @@ def main():
 
     methylation_data_coo = extract_methylation_data_from_bam(input_bam=input_bam, total_cpg_sites=total_cpg_sites, chromosomes=chromosomes, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, windowed_cpg_sites_dict=windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse, quality_limit=quality_limit, verbose=verbose, paranoid=paranoid)  # TODO: simplify these inputs
 
-    assert len(methylation_data_coo[0]) == total_cpg_sites
+    assert len(methylation_data_coo.toarray()[0]) == total_cpg_sites
 
     if verbose:
         print(f"\nWriting methylation data to: {output_file}")
 
     # Save the matrix, which is an ndarray of shape (n_reads, n_cpgs), to a file
-    np.save(output_file, methylation_data_coo, allow_pickle=True)
+    scipy.sparse.save_npz(output_file, methylation_data_coo, compressed=True)
 
     # Report performance time
     if verbose:
