@@ -34,9 +34,10 @@ if 'profile' not in globals():
     def profile(func):
         return func
 
-# Let's make some globals
-# This is frowned upon, and we should probably object-orient things in the future.
+## Globals
 CHROMOSOMES = ["chr" + str(i) for i in range(1, 23)] + ["chrX", "chrY"]
+# dict: {chromosome: index}, e.g. {"chr1": 0, "chr2": 1, ...}
+CHROMOSOMES_DICT = {ch: idx for idx, ch in enumerate(CHROMOSOMES)}
 
 def get_cpg_sites_from_fasta(reference_fasta, verbose=False, skip_cache=False):
     """
@@ -204,6 +205,7 @@ def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose
 
 @profile
 # TODO: Object orient this input / simplify the input?
+# TODO: Ingest chr_to_cpg_to_embedding_dict instead?
 def embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, embedding_pos):
     """
     Given an embedding position, return the chromosome and position.
@@ -215,8 +217,8 @@ def embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_
 
     Returns
     -------
-    pos : int
-        The position.
+    tuple:
+        The chromosome and position, e.g. ("chr1", 12345)
     """
     assert embedding_pos >= 0 and embedding_pos < total_cpg_sites
 
@@ -233,26 +235,26 @@ def embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_
 
 @profile
 # TODO: Object orient this input / simplify the input?
-def genomic_position_to_embedding(cpg_sites_dict, cpgs_per_chr_cumsum, chrom, pos):
+def genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, chrom, pos):
     """
     Given a genomic position, return the embedding position.
 
     Parameters
     ----------
+    chrom : str
+        The chromosome, e.g. "chr1"
     pos : int
-        The position.
+        The position, e.g. 12345
 
     Returns
     -------
     embedding_pos : int
-        The embedding position.
+        The numerical CpG embedding position, e.g. 3493
     """
-    assert chrom in CHROMOSOMES
-
     # Find the index of the chromosome
-    chr_index = CHROMOSOMES.index(chrom)
+    chr_index = CHROMOSOMES_DICT[chrom]
     # Find the index of the CpG site in the chromosome
-    cpg_index = cpg_sites_dict[chrom].index(pos)
+    cpg_index = chr_to_cpg_to_embedding_dict[chrom][pos]
     # If this is the first chromosome, the embedding position is just the CpG index
     if chr_index == 0:
         return cpg_index
@@ -260,24 +262,25 @@ def genomic_position_to_embedding(cpg_sites_dict, cpgs_per_chr_cumsum, chrom, po
     return cpg_index + cpgs_per_chr_cumsum[chr_index - 1]
 
 
+
 @profile
-def extract_methylation_data_from_bam(input_bam, total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False, paranoid=False):
+def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False, debug=False):
     """
     Extract methylation data from a .bam file.
 
     Args:
 
     """
-    input_bam_object = pysam.AlignmentFile(input_bam, "rb", require_index=True, threads=4)
+    input_bam_object = pysam.AlignmentFile(input_bam, "rb", require_index=True, threads=1)
 
     if verbose:
-        print(f"\tTotal reads: {input_bam_object.mapped:,}")
+        print(f"\tTotal reads: {input_bam_object.mapped:,}\n")
 
     # Temporary storage for loading into a COO matrix
     # For a COO, we want three lists:
     # row: the read number (we'll store a read name -> ID dict perhaps?)
     # column: cpg #
-    # data: methylation state (1 [methylated], -1 [unmethylated], and 0 [no data])
+    # data: methylation state (1 [methylated], 0 [unmethylated], and -1 [no data/snv/indel])
     next_coo_row_number = 0
     read_name_to_row_number = {}
 
@@ -286,43 +289,34 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, cpg_sites_dict
     coo_col = []
     coo_data = []
 
-    DEBUG = False
-
     # This is slow, but we only run it once and store the results for later
     for chrom, windowed_cpgs in tqdm(windowed_cpg_sites_dict.items(), disable=not verbose):
         for start_pos, stop_pos in windowed_cpgs:
             cpgs_within_window = windowed_cpg_sites_dict_reverse[chrom][start_pos]
-            if DEBUG:
-                print(f"\tPosition: {start_pos} - {stop_pos}")
-            if DEBUG:
+            if debug:
+                print(f"Window Position: {start_pos} - {stop_pos}")
                 print(f"\tCovered CpGs: {cpgs_within_window}")
             # cpgs_within_window = [10469]
             # This returns an AlignmentSegment object from PySam
             for aligned_segment in input_bam_object.fetch(contig=chrom, start=start_pos, end=stop_pos):
                 if aligned_segment.mapping_quality < quality_limit:
-                    # if DEBUG: print(f"Skipping read {aligned_segment.query_name} with MAPQ {aligned_segment.mapping_quality} < {QUALITY_THRESHOLD}")
                     continue
-
                 if aligned_segment.is_duplicate:
                     continue
                 if aligned_segment.is_qcfail:
                     continue
                 if aligned_segment.is_secondary:
                     continue
-
-                if DEBUG:
-                    print(aligned_segment)
-
-                if paranoid:
+                
+                if debug:
+                    print(aligned_segment.query_name)
                     # Validity tests
                     assert aligned_segment.is_mapped
                     assert aligned_segment.is_supplementary is False
                     assert aligned_segment.reference_start <= stop_pos
                     assert aligned_segment.reference_end >= start_pos
-                    assert aligned_segment.query_alignment_sequence == aligned_segment.get_forward_sequence()
 
                     # Ensure alignment methylation tags exist
-                    assert aligned_segment.has_tag("XB")  # GEM3/Blueprint may add this (also in Biscuit, but different!)
                     assert aligned_segment.has_tag("MD")  # Location of mismatches (methylation)
                     assert aligned_segment.has_tag("YD")  # Bisulfite conversion strand label (f: OT/CTOT C->T or r: OB/CTOB G->A)
 
@@ -352,7 +346,7 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, cpg_sites_dict
                 # The other half (the "daughter strand") was the complement created by PCR, which we don't care about.
                 if bisulfite_parent_strand_is_reverse != aligned_segment.is_reverse:
                     # Skip if we're not on the bisulfite-converted parent strand.
-                    if DEBUG:
+                    if debug:
                         print(f"\t\t Not on methylated strand, skipping: {aligned_segment.query_name}")
                     continue
 
@@ -364,13 +358,10 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, cpg_sites_dict
                 # Let's compare the possible CpGs in this interval to the reference and note status
                 #   A methylated C will be *unchanged* and read as C (pair G)
                 #   An unmethylated C will be *changed* and read as T (pair A)
-                if DEBUG:
-                    print(f"bisulfite_parent_strand_is_reverse: {bisulfite_parent_strand_is_reverse}")
                 for query_pos, ref_pos in this_segment_cpgs:
                     query_base = aligned_segment.query_sequence[query_pos]
                     # query_base2 = aligned_segment.get_forward_sequence()[query_pos] # raw off sequencer
                     # query_base3 = aligned_segment.query_alignment_sequence[query_pos] # this needs to be offset by the soft clip
-                    if DEBUG: print(f"\t{query_pos} {ref_pos} C->{query_base}")
 
                     # Store in our sparse array
                     coo_row.append(next_coo_row_number)
@@ -378,28 +369,26 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, cpg_sites_dict
                     # coo_col.append(ref_pos)
 
                     # TODO: Object orient these inputs? -- lots of bad inheritence style here
-                    coo_col.append(genomic_position_to_embedding(cpg_sites_dict, cpgs_per_chr_cumsum, chrom, ref_pos + 1))
+                    coo_col.append(genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, chrom, ref_pos + 1))
                     # coo_data.append(1 if query_base == "C" else 0)
                     if query_base == "C":
                         # Methylated
                         coo_data.append(1)
-                        if DEBUG:
-                            print("\t\tMethylated")
+                        if debug:
+                            print(f"\t{query_pos} {ref_pos} C->{query_base} [Methylated]")
                     elif query_base == "T":
                         coo_data.append(0)
                         # Unmethylated
-                        if DEBUG:
-                            print("\t\tUnmethylated")
+                        if debug:
+                            print(f"\t{query_pos} {ref_pos} C->{query_base} [Unmethylated]")
                     else:
                         coo_data.append(-1)  # or just 0?
-                        if DEBUG:
-                            print("\t\tUnknown!")
-                        # This may be an SNV or indel perhaps?
-                        # raise ValueError(f"Unexpected query base {query_base} at {query_pos} {ref_pos}")
+                        if debug:
+                            print(f"\t{query_pos} {ref_pos} C->{query_base} [Unknown! SNV? Indel?]")
 
                 read_name_to_row_number[aligned_segment.query_name] = next_coo_row_number
                 next_coo_row_number += 1
-                if DEBUG:
+                if debug:
                     print("************************************************\n")
 
                 # query_bp = aligned_segment.query_sequence[pileupread.query_position]
@@ -431,7 +420,7 @@ def main():
     parser.add_argument("--window-size", help="Window size (default = 150)", default=150, type=int)
     parser.add_argument("--verbose", help="Verbose output.", action="store_true")
     parser.add_argument("--skip-cache", help="De-novo generate CpG sites (slow).", action="store_true")
-    parser.add_argument("--paranoid", help="Paranoid mode (extensive validity checking).", action="store_true")
+    parser.add_argument("--debug", help="Debug mode (extensive validity checking + debug messages).", action="store_true")
     # parser.add_argument("--output-file", help="Output file. Default is to use the extension .methylation.npz. (Only available for single .bam file input.)", default=None)
     parser.add_argument("--overwrite", help="Overwrite output file if it exists.", action="store_true")
 
@@ -442,7 +431,7 @@ def main():
     verbose = args.verbose
     quality_limit = args.quality_limit
     skip_cache = args.skip_cache
-    paranoid = args.paranoid
+    debug = args.debug
     # output_file = args.output_file
     window_size = args.window_size
 
@@ -499,6 +488,9 @@ def main():
 
     assert total_cpg_sites > 28_000_000  # Validity check for hg38
 
+    # Create a dictionary of chromosome -> CpG site -> embedding index for efficient lookup
+    chr_to_cpg_to_embedding_dict = {ch: {cpg: idx for idx, cpg in enumerate(cpg_sites_dict[ch])} for ch in CHROMOSOMES}
+
     # Count the number of CpGs per chromosome
     cpgs_per_chr = {k: len(v) for k, v in cpg_sites_dict.items()}
 
@@ -507,6 +499,7 @@ def main():
 
     # TODO: Move these into to a formal test framework
     # TODO: Simplify the input framework (likely object orient the window / cpg dict?)
+    # FYI embedding_to_genomic_position is unused currently :P
     ### Tests
     assert cpgs_per_chr_cumsum[-1] == total_cpg_sites
     assert embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, 0) == ("chr1", cpg_sites_dict["chr1"][0])
@@ -514,13 +507,16 @@ def main():
     # Edges
     assert embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, cpgs_per_chr_cumsum[0]) == ("chr2", cpg_sites_dict["chr2"][0])
     assert embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, cpgs_per_chr_cumsum[-1] - 1) == ("chrY", cpg_sites_dict["chrY"][-1])
+
     ### Tests
-    assert genomic_position_to_embedding(cpg_sites_dict, cpgs_per_chr_cumsum, "chr1", cpg_sites_dict["chr1"][0]) == 0
-    assert genomic_position_to_embedding(cpg_sites_dict, cpgs_per_chr_cumsum, "chr1", cpg_sites_dict["chr1"][1]) == 1
+    assert genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, "chr1", cpg_sites_dict["chr1"][0]) == 0
+    assert genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, "chr1", cpg_sites_dict["chr1"][1]) == 1
     # Edges
-    assert genomic_position_to_embedding(cpg_sites_dict, cpgs_per_chr_cumsum, "chr2", cpg_sites_dict["chr2"][0]) == cpgs_per_chr_cumsum[0]
-    assert genomic_position_to_embedding(cpg_sites_dict, cpgs_per_chr_cumsum, "chrY", cpg_sites_dict["chrY"][-1]) == cpgs_per_chr_cumsum[-1] - 1
+    assert genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, "chr2", cpg_sites_dict["chr2"][0]) == cpgs_per_chr_cumsum[0]
+    assert genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, "chrY", cpg_sites_dict["chrY"][-1]) == cpgs_per_chr_cumsum[-1] - 1
     ########
+
+
 
     # Get our windowed_cpg_sites, hopefully cached!
     if verbose:
@@ -544,7 +540,9 @@ def main():
             print(f"Processing BAM file {i+1} of {len(bams_to_process)}")
             print(f"\nExtracting methylation data from: {input_bam}")
 
-        methylation_data_coo = extract_methylation_data_from_bam(input_bam=input_bam, total_cpg_sites=total_cpg_sites, cpg_sites_dict=cpg_sites_dict, cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, windowed_cpg_sites_dict=windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse, quality_limit=quality_limit, verbose=verbose, paranoid=paranoid)  # TODO: simplify these inputs
+        methylation_data_coo = extract_methylation_data_from_bam(input_bam=input_bam, total_cpg_sites=total_cpg_sites, chr_to_cpg_to_embedding_dict=chr_to_cpg_to_embedding_dict,
+                                                                 cpgs_per_chr_cumsum=cpgs_per_chr_cumsum, windowed_cpg_sites_dict=windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse=windowed_cpg_sites_dict_reverse,
+                                                                 quality_limit=quality_limit, verbose=verbose, debug=debug)  # TODO: simplify these inputs!
 
         assert len(methylation_data_coo.toarray()[0]) == total_cpg_sites
 
