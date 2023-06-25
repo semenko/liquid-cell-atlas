@@ -274,7 +274,22 @@ rule biscuit_qc_index:
         build_biscuit_QC_assets.pl --verbose --ref {input.masked_reference_genome} --outdir {params.out_dir} >{log} 2>&1
         """
 
-
+### bwameth index (using bwa-mem2)
+rule bwa_meth_index:
+    conda: "envs/env.yaml"
+    input:
+        masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
+    output:
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.0123",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.amb",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.ann",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.bwt.2bit.64",
+        "{DATA_PATH}/reference/GRCh38-DAC-U2AF1.fna.bwameth.c2t.pac"
+    log:
+        index = "{DATA_PATH}/reference/bwameth_bwa-mem2-index.log.txt"
+    shell:
+        "bwameth.py index-mem2 {input.masked_reference_genome} >{log.index} 2>&1"
 
 
 ###############
