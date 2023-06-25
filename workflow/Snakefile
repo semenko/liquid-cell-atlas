@@ -382,7 +382,7 @@ def trim_poly_g(input):
 
 
 ### fastp
-# We adapter trimming and poly-g filtering, but leave quality filtering / polyN filtering for later.
+# We adapter trimming, poly-g filtering, and initial quality filtering
 # NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
 rule fastp:
     group:
@@ -433,7 +433,7 @@ rule fastp:
         fastp --in1 {input.r1_file} --in2 {input.r2_file} \
         --trim_front1 {params.trim_r1_5prime} --trim_tail1 {params.trim_r1_3prime} \
         --trim_front2 {params.trim_r2_5prime} --trim_tail2 {params.trim_r2_3prime} \
-        --length_required {params.minimum_length} --disable_quality_filtering {params.trim_poly_g_flag} \
+        --length_required {params.minimum_length} {params.trim_poly_g_flag} \
         --adapter_sequence "{params.adapter_r1}" --adapter_sequence_r2 "{params.adapter_r2}" \
         --json "{output.fastp_json}" --html "{output.fastp_html}" \
         --thread {threads} --verbose --failed_out {output.fastp_failed} --stdout \
