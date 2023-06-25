@@ -27,7 +27,7 @@ from snakemake.workflow import Workflow
 DATA_PATH = os.path.join(os.path.dirname(workflow.snakefile), "../data")
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/melanoma.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -269,14 +269,12 @@ rule biscuit_qc_index:
     params:
         out_dir="{DATA_PATH}/reference/biscuit_qc/",
     shell:
-        # NOTE: The -f force in init_genome seems to be required for wgbs_tools to build in a symlinked directory,
-        # otherwise it seems to think the index already exists (when it doesn't).
-        # NOTE: Consider just run the ln -s if path exists, otherwise this gets re-build on other nodes if there are multiple running nodes
-        # and a shared resource directory?
         """
         mkdir {params.out_dir}
         build_biscuit_QC_assets.pl --verbose --ref {input.masked_reference_genome} --outdir {params.out_dir} >{log} 2>&1
         """
+
+
 
 
 ###############
@@ -475,13 +473,9 @@ rule mark_nonconverted:
         nonconverted="{DATA_PATH}/{experiment}/{sample}/logs/mark-nonconverted.log.txt",
     params:
         threshold=3,  # If 3 nonconverted Cs on a read, consider it nonconverted
-        # NOTE: We spew lots of this warnin from samtools: [W::sam_parse1] unrecognized reference name ""; treated as unmapped
-        # This string will be filtered from our log file.
-        # TODO: Further investigate this warning
-        ignore_string="[W::sam_parse1] unrecognized reference name ",
     shell:
         """
-        cat {input.aligned_sam} | mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} --flag_reads 2>&1 >{output} | grep -vF "{params.ignore_string}" >{log.nonconverted}
+        cat {input.aligned_sam} | mark-nonconverted-reads.py --c_count {params.threshold} --reference {input.reference_genome} --flag_reads 2>{log.nonconverted} >{output}
         """
 
 
@@ -520,7 +514,7 @@ rule samtools_fixmate_sort_markdup:
         # biscuit: -c correct YD tag, -y append YC and YG tags
         """
         cat {input.mark_nonconv} | samtools fixmate -u -m --output-fmt SAM --threads 1 - - 2>{log.fixmate} | \
-        samtools sort --output-fmt SAM -m 8G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
+        samtools sort --output-fmt SAM -m 12G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
         samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --threads {threads} -T {resources.tmpdir} - - 2>{log.markdup} | \
         biscuit bsstrand -c -y {input.reference_genome} - {output.bam} >{log.bsstrand} 2>&1
         """
@@ -575,6 +569,7 @@ rule samtools_statistics:
 # Generate a bed file of all methylation calls
 # We make this one long pipe, since the .vcf is enormous (~10GB/alignment), and we don't need to keep it around.
 # NOTE: mergecg expects a sorted .bed -- I'm pretty sure the sort here is unnecessary, but it's cheap enough.
+# NOTE: Temporarily disabled, .bam for now for aggressive speed.
 rule biscuit_bed:
     conda:
         "envs/env.yaml"
@@ -730,7 +725,7 @@ rule touch_complete_flag:
         "envs/env.yaml"
     input:
         # rules.biscuit_epiread.output,
-        rules.biscuit_bed.output,
+        # rules.biscuit_bed.output,
         rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
@@ -739,7 +734,7 @@ rule touch_complete_flag:
     output:
         "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete",
     params:
-        out_flag="{DATA_PATH}/{experiment}/{sample}/.pipeline-complete",
+        out_flag="{DATA_PATH}/{experiment}/{sample}/.pipeline-complete-v2",
     shell:
         """
         touch {params.out_flag}
