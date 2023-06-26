@@ -145,7 +145,7 @@ rule all:
         else [],
         # Each sub-job has a dependency logged here as
         multiqc=[
-            f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.pipeline-complete"
+            f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.pipeline-complete-v2"
             for sample in ALL_SAMPLES_LIST
         ],
         # Run multiqc per-experiment as our ~last step
@@ -771,7 +771,7 @@ rule touch_complete_flag:
         rules.methyldackel_mbias_plots.output,
         rules.goleft_indexcov.output,
     output:
-        "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete",
+        "{DATA_PATH}/{experiment}/{sample}/.pipeline-complete-v2",
     params:
         out_flag="{DATA_PATH}/{experiment}/{sample}/.pipeline-complete-v2",
     shell:
