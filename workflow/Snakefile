@@ -228,6 +228,7 @@ rule mask_reference_fasta:
 
 ### biscuit index
 # Runs once to generate biscuit indices
+# NOTE: Not referenced currently, as we aren't calling SNVs w/ biscuit
 rule biscuit_index:
     conda:
         "envs/env.yaml"
@@ -276,7 +277,8 @@ rule biscuit_qc_index:
 
 ### bwameth index (using bwa-mem2)
 rule bwa_meth_index:
-    conda: "envs/env.yaml"
+    conda:
+        "envs/env.yaml"
     input:
         masked_reference_genome = ancient(rules.mask_reference_fasta.output.masked_reference_genome)
     output:
@@ -441,32 +443,56 @@ rule fastp:
         """
 
 
-### biscuit
-# Unfortunately bwameth made it very difficult to extract read-level CpG methylation data -- this wasn't
-# built into MethylDackel. After evaluating bwameth vs biscuit, the updated biscuit (>1.1, not what the old
-# pipeline ran) seems like a solid approach.
-rule biscuit:
+### bwameth / bwa-mem2
+# Blazing fast alignment
+rule bwa_meth:
     group:
         "align_core"
     conda:
         "envs/env.yaml"
     input:
-        input_fasta="{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
-        reference_genome=rules.mask_reference_fasta.output.masked_reference_genome,
-        biscuit_indices=ancient(rules.biscuit_index.output),
+        input_fasta = "{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
+        reference_genome = rules.mask_reference_fasta.output.masked_reference_genome,
+        bwa_meth_indices = ancient(rules.bwa_meth_index.output)  # We assume ancient, to not force re-run of bwa mem vs bwa-mem2
     output:
-        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam")),
+        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam"))
     params:
         # TODO: Should we include the platform or barcode here? Does that have value for us?
-        read_group="@RG\\tID:{sample}\\tSM:{sample}",
+        read_group = "@RG\\tID:{sample}\\tSM:{sample}"
     log:
-        biscuit_err="{DATA_PATH}/{experiment}/{sample}/logs/biscuit.log.txt",
+        bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
     benchmark:
-        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/biscuit.txt"
-    threads: lambda x: len(os.sched_getaffinity(0))
+        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/bwameth.txt"
+    threads: lambda x: round(len(os.sched_getaffinity(0))/2)  # Leave two cores for the OS
     shell:
-        # -p: interleaved
-        "biscuit align -@ {threads} -R '{params.read_group}' -p {input.reference_genome} {input.input_fasta} 2>{log.biscuit_err} >{output}"
+        "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
+
+
+### biscuit
+# Solid for SNV analysis, but *very slow* -- approximately 30 hours on a 40 core machine.
+# NOTE: Temporarily not used, as we're not doing SNV analysis at the moment.
+#rule biscuit:
+#    group:
+#        "align_core"
+#-2    conda:
+#        "envs/env.yaml"
+#    input:
+#        input_fasta="{DATA_PATH}/{experiment}/{sample}/fastp/interleaved.fa",
+#        reference_genome=rules.mask_reference_fasta.output.masked_reference_genome,
+#        biscuit_indices=ancient(rules.biscuit_index.output),
+#    output:
+#        temp(pipe("{DATA_PATH}/{experiment}/{sample}/samtools/raw.sam")),
+#    params:
+#        # TODO: Should we include the platform or barcode here? Does that have value for us?
+#        read_group="@RG\\tID:{sample}\\tSM:{sample}",
+#    log:
+#        biscuit_err="{DATA_PATH}/{experiment}/{sample}/logs/biscuit.log.txt",
+#    benchmark:
+#        "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/biscuit.txt"
+#    threads: lambda x: len(os.sched_getaffinity(0))
+#    shell:
+#        # -p: interleaved
+#        "biscuit align -@ {threads} -R '{params.read_group}' -p {input.reference_genome} {input.input_fasta} 2>{log.biscuit_err} >{output}"
 
 
 ### mark nonconverted reads
@@ -494,7 +520,7 @@ rule mark_nonconverted:
         """
 
 
-### fixmate, sort, markdup, bsstrand
+### fixmate, sort, markdup
 ## These were originally defined as named pipes between snakemake blocks,
 ## but I ran into a group bug that I couldn't work around: https://github.com/snakemake/snakemake/issues/1822
 ## So now we're one large block shell command *shrug*.
@@ -506,7 +532,6 @@ rule samtools_fixmate_sort_markdup:
         "envs/env.yaml"
     input:
         mark_nonconv=rules.mark_nonconverted.output,
-        reference_genome=rules.mask_reference_fasta.output.masked_reference_genome,
     output:
         bam=protected("{DATA_PATH}/{experiment}/{sample}/{sample}.bam"),
         stats_file=ensure(
@@ -517,7 +542,6 @@ rule samtools_fixmate_sort_markdup:
         fixmate="{DATA_PATH}/{experiment}/{sample}/logs/samtools-fixmate.log.txt",
         sort="{DATA_PATH}/{experiment}/{sample}/logs/samtools-sort.log.txt",
         markdup="{DATA_PATH}/{experiment}/{sample}/logs/samtools-markdup.log.txt",
-        bsstrand="{DATA_PATH}/{experiment}/{sample}/logs/biscuit-bsstrand.log.txt",
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/samtools.txt"
     threads: 4
@@ -526,19 +550,19 @@ rule samtools_fixmate_sort_markdup:
         # fixmate: -u uncompressed output / -m add mate score tag
         # sort: coodinate sorted, uncompressed sam, sort -m is memory *per thread*
         # TODO: Mark supplementary reads of duplicates as duplicates? (-S)
-        # biscuit: -c correct YD tag, -y append YC and YG tags
+        # NOTE: This previously ran bsstrand, though was a blocker of unclear utility (fixed <0.5% of reads?)
+        #  biscuit bsstrand -c -y {input.reference_genome} - {output.bam} >{log.bsstrand} 2>&1
+        #  biscuit: -c correct YD tag, -y append YC and YG tags
         """
         cat {input.mark_nonconv} | samtools fixmate -u -m --output-fmt SAM --threads 1 - - 2>{log.fixmate} | \
         samtools sort --output-fmt SAM -m 12G --threads {threads} -T {resources.tmpdir} - 2>{log.sort} | \
-        samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --threads {threads} -T {resources.tmpdir} - - 2>{log.markdup} | \
-        biscuit bsstrand -c -y {input.reference_genome} - {output.bam} >{log.bsstrand} 2>&1
+        samtools markdup -f {output.stats_file} --output-fmt BAM --output-fmt-option level=1 --threads {threads} -T {resources.tmpdir} - {output.bam} 2>{log.markdup}
         """
 
 
 ###############
 ### Statistics and QC Graphs
 ###############
-
 
 ### samtools index
 rule samtools_index:
