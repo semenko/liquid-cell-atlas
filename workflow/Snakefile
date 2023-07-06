@@ -27,7 +27,7 @@ from snakemake.workflow import Workflow
 DATA_PATH = os.path.join(os.path.dirname(workflow.snakefile), "../data")
 
 # Loop over the experiment definition files (e.g. melanoma.csv, crc.csv)
-data_config_files = glob.glob(f"{DATA_PATH}/healthy.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
 # data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
@@ -411,6 +411,8 @@ rule fastp:
     log:
         fastp_err="{DATA_PATH}/{experiment}/{sample}/logs/fastp.log.txt",
     threads: 3  # Three threads is apparently the default.
+    resources:
+       mem_mb = 6000
     params:
         # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
         # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
@@ -463,7 +465,9 @@ rule bwa_meth:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/bwameth.txt"
-    threads: lambda x: round(len(os.sched_getaffinity(0))/2)  # Leave two cores for the OS
+    threads: lambda x: len(os.sched_getaffinity(0))-10  # RIS allocation -- all cores but 10?  # round(len(os.sched_getaffinity(0))/2
+    resources:
+       mem_mb = 72000
     shell:
         "bwameth.py -p -t {threads} --read-group '{params.read_group}' --reference {input.reference_genome} {input.input_fasta} 2>{log.bwameth_err} >{output}"
 
@@ -545,6 +549,8 @@ rule samtools_fixmate_sort_markdup:
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/samtools.txt"
     threads: 4
+    resources:
+       mem_mb = 64000
     shell:
         # fixmate is needed for markdup -- it adds ms and MC tags
         # fixmate: -u uncompressed output / -m add mate score tag
@@ -732,10 +738,11 @@ rule fastqc_bam:
         out_dir="{DATA_PATH}/{experiment}/{sample}/fastqc/",
     log:
         "{DATA_PATH}/{experiment}/{sample}/logs/fastqc.log.txt",
+    threads: 8
     shell:
         """
         mkdir -p {params.out_dir}
-        fastqc --outdir {params.out_dir} {input} >{log} 2>&1
+        fastqc --threads 8 --outdir {params.out_dir} {input} >{log} 2>&1
         """
 
 
@@ -765,7 +772,7 @@ rule touch_complete_flag:
     input:
         # rules.biscuit_epiread.output,
         # rules.biscuit_bed.output,
-        rules.biscuit_qc.output,
+        #rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
         rules.methyldackel_mbias_plots.output,
