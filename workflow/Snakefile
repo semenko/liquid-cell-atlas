@@ -773,7 +773,7 @@ rule touch_complete_flag:
         "envs/env.yaml"
     input:
         # rules.biscuit_epiread.output,
-        # rules.biscuit_bed.output,
+        rules.biscuit_bed.output,
         #rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
