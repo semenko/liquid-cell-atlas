@@ -30,7 +30,7 @@ DATA_PATH = os.path.join(os.path.dirname(workflow.snakefile), "../data")
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Only operate on EM-seq files (ignore BS-seq)
 EMSEQ_ONLY = True
@@ -366,25 +366,6 @@ rule seqtk_subsample:
         """
 
 
-# Trim poly-g if this is a two-color system
-def trim_poly_g(input):
-    with gzip.open(input.r1_file, "rt") as r1_in, gzip.open(
-        input.r2_file, "rt"
-    ) as r2_in:
-        for line_r1, line_r2 in zip(r1_in, r2_in):
-            line_r1_instrument = line_r1.split(":")[0]
-            line_r2_instrument = line_r2.split(":")[0]
-            assert (
-                line_r1_instrument == line_r2_instrument
-            ), "R1 and R2 come from different instruments! Not possible."
-            break
-    return (
-        "--trim_poly_g"
-        if line_r1_instrument.startswith(tuple(["@A0", "@NS", "@NB", "@VH"]))
-        else ""
-    )
-
-
 ### fastp
 # We adapter trimming, poly-g filtering, and initial quality filtering
 # NOTE: We also do read trimming here, 10-15 BP depending on EM- vs BS-seq
@@ -416,10 +397,6 @@ rule fastp:
     resources:
        mem_mb = 6000
     params:
-        # Inspired to do poly-g trimming by the NEB EM-seq pipeline:
-        # https://github.com/nebiolabs/EM-seq/blob/master/em-seq.nf
-        # TODO: make this selective for NextSeq/NovaSeq-only runs?
-        trim_poly_g_flag=lambda wildcards, input: trim_poly_g(input),
         # Note: --overrepresentation_analysis was overwhelming with our huge sequencing data, disabled for now.
         ## Trim specific to BS vs EM-seq input type
         # Note that we could probably be less conservative, and trim less from EMSeq
@@ -439,7 +416,7 @@ rule fastp:
         fastp --in1 {input.r1_file} --in2 {input.r2_file} \
         --trim_front1 {params.trim_r1_5prime} --trim_tail1 {params.trim_r1_3prime} \
         --trim_front2 {params.trim_r2_5prime} --trim_tail2 {params.trim_r2_3prime} \
-        --length_required {params.minimum_length} {params.trim_poly_g_flag} \
+        --length_required {params.minimum_length} \
         --adapter_sequence "{params.adapter_r1}" --adapter_sequence_r2 "{params.adapter_r2}" \
         --json "{output.fastp_json}" --html "{output.fastp_html}" \
         --thread {threads} --verbose --failed_out {output.fastp_failed} --stdout \
