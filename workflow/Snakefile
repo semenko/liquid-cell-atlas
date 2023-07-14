@@ -81,9 +81,9 @@ for filename in data_config_files:
             file=sys.stderr,
         )
 
-    # If the subsampled flag is enabled, that means we're *operating* on subsampled data
-    # (We're not making it -- it's made on regular / full runs.)
-    if "subsampled" in config:
+    # If the analyze-subsampled flag is enabled, that means we're *operating* on subsampled data
+    # (We're not making it -- it's made on runs with make-subsampled)
+    if "analyze-subsampled" in config:
         # So we'll append the _subsampled suffix to experiments
         experiment_df["experiment"] = experiment + "_subsampled"
 
@@ -130,29 +130,31 @@ ALL_SAMPLES_LIST.extend(all_experiments_data)
 ###############
 rule all:
     input:
-        # If you do NOT pass the subsampled flag, then we'll generate subsampled reads (from the full .fastq)
+        # If you pass the make-subsampled flag, then we'll generate subsampled reads (from the full .fastq)
         r1ss=[
             f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R1.fastq.gz"
             for sample in ALL_SAMPLES_LIST
         ]
-        if "subsampled" not in config
+        if "make-subsampled" in config
         else [],
         r2ss=[
             f"{DATA_PATH}/{sample['experiment']}_subsampled/{sample['sample_id']}/raw/R2.fastq.gz"
             for sample in ALL_SAMPLES_LIST
         ]
-        if "subsampled" not in config
+        if "make-subsampled" in config
         else [],
         # Each sub-job has a dependency logged here as
         multiqc=[
             f"{DATA_PATH}/{sample['experiment']}/{sample['sample_id']}/.pipeline-complete-v2"
             for sample in ALL_SAMPLES_LIST
-        ],
+        ] if "make-subsampled" not in config
+        else [],
         # Run multiqc per-experiment as our ~last step
         expt_multiqc=[
             f"{DATA_PATH}/{sample['experiment']}/multiqc/multiqc_report.html"
             for sample in ALL_SAMPLES_LIST
-        ],
+        ] if "make-subsampled" not in config
+        else [],
 
 
 ###############
