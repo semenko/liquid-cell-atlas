@@ -616,7 +616,6 @@ rule samtools_statistics:
 # Generate a bed file of all methylation calls
 # We make this one long pipe, since the .vcf is enormous (~10GB/alignment), and we don't need to keep it around.
 # NOTE: mergecg expects a sorted .bed -- I'm pretty sure the sort here is unnecessary, but it's cheap enough.
-# NOTE: Temporarily disabled, .bam for now for aggressive speed.
 rule biscuit_bed:
     conda:
         "envs/env.yaml"
@@ -656,7 +655,7 @@ rule biscuit_bed:
 # Note that we can do filtering here, including quality / alignment score filtering: https://huishenlab.github.io/biscuit/biscuit_epiread/
 # TODO: Add a filtering option to target specific .bed regions? (epiread supports this with the -g option, I think)
 # TODO: Investigate pairwise mode?
-# NOTE: Temporarily disabled, using vcf/bed above
+# NOTE: Temporarily disabled
 rule biscuit_epiread:
     conda:
         "envs/env.yaml"
