@@ -30,10 +30,10 @@ DATA_PATH = os.path.join(os.path.dirname(workflow.snakefile), "../data")
 data_config_files = glob.glob(f"{DATA_PATH}/*.csv")
 
 # Uncomment for test runs
-data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
+# data_config_files = glob.glob(f"{DATA_PATH}/test.csv")
 
 # Only operate on EM-seq files (ignore BS-seq)
-EMSEQ_ONLY = True
+EMSEQ_ONLY = False
 
 # Store a big table of all our experiment .csvs
 all_experiments_df = pd.DataFrame()
@@ -614,6 +614,8 @@ rule biscuit_bed:
         sample_str="{sample}",
         minimum_reads=3,
     threads: 10
+    resources:
+       mem_mb = 128000
     shell:
         """
         biscuit pileup -@ {threads} {input.masked_reference_genome} {input.bam} 2>{log.pileup} | \
