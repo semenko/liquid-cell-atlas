@@ -306,10 +306,10 @@ rule bwa_meth_index:
 # This should NOT run on subsampled files
 rule md5sum:
     input:
-        r1_file=lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/"
-        + all_experiments_df.loc[wildcards.sample, "path_R1"],
-        r2_file=lambda wildcards: "{DATA_PATH}/{experiment}/{sample}/raw/"
-        + all_experiments_df.loc[wildcards.sample, "path_R2"],
+        r1_file=lambda wildcards: ancient("{DATA_PATH}/{experiment}/{sample}/raw/"
+        + all_experiments_df.loc[wildcards.sample, "path_R1"]),
+        r2_file=lambda wildcards: ancient("{DATA_PATH}/{experiment}/{sample}/raw/"
+        + all_experiments_df.loc[wildcards.sample, "path_R2"]),
     output:
         # We keep these in the raw directory to make it easier to reset/remove runs (rm everything except raw/)
         checksums="{DATA_PATH}/{experiment}/{sample}/raw/md5.known.txt",
@@ -752,7 +752,7 @@ rule touch_complete_flag:
     input:
         # rules.biscuit_epiread.output,
         rules.biscuit_bed.output,
-        #rules.biscuit_qc.output,
+        rules.biscuit_qc.output,
         rules.samtools_statistics.output,
         rules.fastqc_bam.output,
         rules.methyldackel_mbias_plots.output,
