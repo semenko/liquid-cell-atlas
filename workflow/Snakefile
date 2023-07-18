@@ -444,7 +444,10 @@ rule bwa_meth:
         bwameth_err = "{DATA_PATH}/{experiment}/{sample}/logs/bwameth.log.txt"
     benchmark:
         "{DATA_PATH}/{experiment}/{sample}/logs/benchmark/bwameth.txt"
-    threads: lambda x: len(os.sched_getaffinity(0))-10  # RIS allocation -- all cores but 10?  # round(len(os.sched_getaffinity(0))/2
+    # On some cluster executions (e.g., LSF/RIS), we need to limit the number of threads a bit, becuase at runtime,
+    # if the execution group exceeds the allocation, it's killed. Here, we limit to N-8.
+    # The 8 comes from the rest of the thread group: 3 for fastp, 1 for mark nonconverted, 3 for fixmate/sort/markdup
+    threads: lambda x: len(os.sched_getaffinity(0))-8  # All cores but 8
     resources:
        mem_mb = 72000
     shell:
