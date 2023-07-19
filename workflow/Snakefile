@@ -301,7 +301,7 @@ rule bwa_meth_index:
 rule wgbs_build:
     conda: "envs/env.yaml"
     input:
-        git_submodule_init = ancient(rules.git_submodule_init.output)
+        # git_submodule_init = ancient(rules.git_submodule_init.output)
     output:
         "wgbs_tools/src/python/wgbs_tools.py"
     log:
@@ -790,7 +790,7 @@ rule wgbs_tools_pat_beta:
         "envs/env.yaml"
     input:
         bam=rules.samtools_fixmate_sort_markdup.output.bam,
-        index=rules.wgbs_tools_index.output,
+        # index=rules.wgbs_tools_index.output, # Temporarily assume pre-built index.
     output:
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.beta",
         "{DATA_PATH}/{experiment}/{sample}/wgbs_tools/{sample}.pat.gz",
@@ -801,9 +801,9 @@ rule wgbs_tools_pat_beta:
         "{DATA_PATH}/{experiment}/{sample}/logs/wgbs_tools-bam2pat.log.txt"
     params:
         out_dir="{DATA_PATH}/{experiment}/{sample}/wgbs_tools/"
-    threads: 1
+    threads: 8
     shell:
-        "./wgbs_tools/wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
+        "wgbstools bam2pat --genome GRCh38-DAC-U2AF1 --out_dir {params.out_dir} --mbias --verbose --threads {threads} {input.bam} >{log} 2>&1"
 
 
 
