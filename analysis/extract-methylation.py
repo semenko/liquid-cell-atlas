@@ -32,10 +32,6 @@ from tqdm import tqdm
 # We use SeqIO to parse the reference .fa file
 from Bio import SeqIO
 
-# Empty decorator when not in kernprof
-if 'profile' not in globals():
-    def profile(func):
-        return func
 
 ## Globals
 CHROMOSOMES = ["chr" + str(i) for i in range(1, 23)] + ["chrX", "chrY"]
@@ -210,7 +206,6 @@ def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose
     return windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse
 
 
-@profile
 # TODO: Object orient this input / simplify the input?
 # TODO: Ingest chr_to_cpg_to_embedding_dict instead?
 def embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_cumsum, embedding_pos):
@@ -240,7 +235,7 @@ def embedding_to_genomic_position(total_cpg_sites, cpg_sites_dict, cpgs_per_chr_
     embedding_pos -= cpgs_per_chr_cumsum[chr_index - 1]
     return CHROMOSOMES[chr_index], cpg_sites_dict[CHROMOSOMES[chr_index]][embedding_pos]
 
-@profile
+
 # TODO: Object orient this input / simplify the input?
 def genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, chrom, pos):
     """
@@ -269,8 +264,6 @@ def genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cum
     return cpg_index + cpgs_per_chr_cumsum[chr_index - 1]
 
 
-
-@profile
 def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, windowed_cpg_sites_dict, windowed_cpg_sites_dict_reverse, quality_limit=0, verbose=False, debug=False):
     """
     Extract methylation data from a .bam file.
