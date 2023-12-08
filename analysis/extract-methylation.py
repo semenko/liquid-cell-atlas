@@ -298,6 +298,8 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                 print(f"\tCovered CpGs: {cpgs_within_window}")
             # cpgs_within_window = [10469]
             # This returns an AlignmentSegment object from PySam
+
+            # TODO: Think carefully here -- A read could span more than one segment, right?!?
             for aligned_segment in input_bam_object.fetch(contig=chrom, start=start_pos, end=stop_pos):
                 if aligned_segment.mapping_quality < quality_limit:
                     continue
@@ -333,7 +335,6 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                         # This read derives from the OB/CTOB strand: G->A substitutions matter (G = methylated, A = unmethylated)
                         bisulfite_parent_strand_is_reverse = True
                 elif aligned_segment.has_tag("XB"):  # gem3 / blueprint tag
-                    raise NotImplementedError("XB tag not validated yet")
                     xb_tag = aligned_segment.get_tag("XB")  # XB:C = Forward / Reference was CG
                     # TODO: Double check one or two of these gem3 tags manually.
                     if xb_tag == "C":
@@ -347,7 +348,7 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                 if bisulfite_parent_strand_is_reverse != aligned_segment.is_reverse:
                     # Skip if we're not on the bisulfite-converted parent strand.
                     if debug:
-                        print(f"\t\t Not on methylated strand, skipping: {aligned_segment.query_name}")
+                        print("\tNot on methylated strand, ignoring.")
                     continue
 
                 # get_aligned_pairs returns a list of tuples of (read_pos, ref_pos)
@@ -386,6 +387,8 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                         if debug:
                             print(f"\t{query_pos} {ref_pos} C->{query_base} [Unknown! SNV? Indel?]")
 
+                assert aligned_segment.query_name not in read_name_to_row_number
+
                 read_name_to_row_number[aligned_segment.query_name] = next_coo_row_number
                 next_coo_row_number += 1
                 if debug:
@@ -394,7 +397,29 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                 # query_bp = aligned_segment.query_sequence[pileupread.query_position]
                 # reference_bp = aligned_segment.get_reference_sequence()[aligned_segment.reference_start - pileupcolumn.reference_pos].upper()
 
-    return scipy.sparse.coo_matrix((coo_data, (coo_row, coo_col)), shape=(len(read_name_to_row_number) + 1, total_cpg_sites))
+
+    ## IIRC there's still a critical edge here, where sometimes we raise ValueError('row index exceeds matrix dimensions')
+
+    # Validity checks -- TODO: move elsewhere? to loader?
+    assert max(coo_data) <= 1
+    assert min(coo_data) >= -1
+
+    print("Debug info for coo_matrix dimensions:")
+    print(f"\tcoo_row: {len(coo_row):,}")
+    print(f"\tcoo row max: {max(coo_row):,}")
+    print(f"\tcoo_col: {len(coo_col):,}")
+    print(f"\tcoo col max: {max(coo_col):,}")
+    print(f"\tcoo_data: {len(coo_data):,}")
+    print(f"\tlen(read_name_to_row_number): {len(read_name_to_row_number):,}")
+    print(f"\ttotal_cpg_sites: {total_cpg_sites:,}")
+
+    # The size of the coo_matrix is:
+    #   Number of rows = number of reads that pass our filters
+    #   Number of columns = number of CpG sites
+
+    return scipy.sparse.coo_matrix((coo_data, (coo_row, coo_col)), shape=(next_coo_row_number, total_cpg_sites))
+
+    # return scipy.sparse.coo_matrix((coo_data, (coo_row, coo_col)), shape=(len(read_name_to_row_number) + 1, total_cpg_sites))
 
 
 def main():
