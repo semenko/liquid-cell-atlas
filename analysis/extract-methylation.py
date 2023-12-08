@@ -3,7 +3,10 @@
 ##
 # A command-line Python script to extract methylation data from an aligned .bam file.
 # This assumes alignment with Biscuit, or with gem3-mapper and gemBS, though it should work with any aligner.
+#
 # TODO: Test with other aligners.
+#
+# Note this is designed for readability & ease of use (not speed) since it's a one-time use script.
 #
 #
 # Copyright (c) 2023 Nick Semenkovich <semenko@alum.mit.edu>.
@@ -87,7 +90,7 @@ def get_cpg_sites_from_fasta(reference_fasta, verbose=False, skip_cache=False):
         sequence = seqrecord.seq
 
         # Find all CpG sites
-        # The i+1 is because we want to store the 1-based position, because .bed is wild and arguably 1-based maybe:
+        # The pos+1 is because we want to store the 1-based position, because .bed is wild and arguably 1-based maybe:
         # e.g. https://genome-blog.soe.ucsc.edu/blog/2016/12/12/the-ucsc-genome-browser-coordinate-counting-systems/
         # Regardless, $ samtools faidx GRCh38-DAC-U2AF1.fna chr1:0-0 throws an error, while
         # $ samtools faidx GRCh38-DAC-U2AF1.fna chr1:1-1 returns the correct base.
@@ -110,6 +113,7 @@ def get_cpg_sites_from_fasta(reference_fasta, verbose=False, skip_cache=False):
     return cpg_sites_dict
 
 
+# TODO: Ponder this window size, as aligned reads might be larger by a bit... Is this useful?
 def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose=False, skip_cache=False):
     """
     Generate a dict of CpG sites for each chromosome in the reference genome.
@@ -119,6 +123,9 @@ def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose
     The value is a list of CpG sites: e.g. [(0, 35), (190, 212), (1055, ...)]
 
     We store this as a dict because it's easier to portably serialize to disk as JSON.
+
+    NOTE: The window size is tricky -- it's set usually to the read size, but reads can be larger than the window size, 
+    since they can map with deletions, etc. So we need to be careful here.
 
     Args:
         reference_fasta (str): Path to the reference genome .fa file.
@@ -158,8 +165,8 @@ def get_windowed_cpg_sites(reference_fasta, cpg_sites_dict, window_size, verbose
         print(f"\n\tGenerating windowed CpG sites dict (window size = {window_size} bp.)\n")
 
     # This is a dict of lists, where but each list contains a tuple of CpG ranges witin a window
-    # The key is the chromosome: e.g. "chr1"
-    # The value is a list of tuples: e.g. [(0,35), (190,212), (1055,)]
+    # Key: chromosome, e.g. "chr1"
+    # Value: a list of tuples, e.g. [(0,35), (190,212), (1055,)]
     windowed_cpg_sites_dict = {}
 
     # And a reverse dict of dicts where chrom->window_start->[cpgs]
