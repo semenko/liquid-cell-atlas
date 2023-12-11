@@ -2,11 +2,12 @@
 # -*- coding: utf-8 -*-
 ##
 # A command-line Python script to extract methylation data from an aligned .bam file.
+#
 # This assumes alignment with Biscuit, or with gem3-mapper and gemBS, though it should work with any aligner.
 #
 # TODO: Test with other aligners.
 #
-# Note this is designed for readability & ease of use (not speed) since it's a one-time use script.
+# This is designed for readability & ease of use (not speed) since it's a one-time use script.
 #
 #
 # Copyright (c) 2023 Nick Semenkovich <semenko@alum.mit.edu>.
@@ -31,7 +32,6 @@ from tqdm import tqdm
 
 # We use SeqIO to parse the reference .fa file
 from Bio import SeqIO
-
 
 ## Globals
 CHROMOSOMES = ["chr" + str(i) for i in range(1, 23)] + ["chrX", "chrY"]
@@ -275,19 +275,19 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
 
     if verbose:
         print(f"\tTotal reads: {input_bam_object.mapped:,}\n")
+    if debug:
+        debug_read_name_to_row_number = {}
 
     # Temporary storage for loading into a COO matrix
     # For a COO, we want three lists:
     # row: the read number (we'll store a read name -> ID dict perhaps?)
     # column: cpg #
     # data: methylation state (1 [methylated], 0 [unmethylated], and -1 [no data/snv/indel])
-    next_coo_row_number = 0
-    read_name_to_row_number = {}
+    read_number = 0
 
-    # TODO: Modularize/clean?
-    coo_row = []
-    coo_col = []
-    coo_data = []
+    coo_row = []   # Read number
+    coo_col = []   # CpG number (embedding)
+    coo_data = []  # Methylation state
 
     # This is slow, but we only run it once and store the results for later
     for chrom, windowed_cpgs in tqdm(windowed_cpg_sites_dict.items(), disable=not verbose):
@@ -296,10 +296,10 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
             if debug:
                 print(f"Window Position: {start_pos} - {stop_pos}")
                 print(f"\tCovered CpGs: {cpgs_within_window}")
-            # cpgs_within_window = [10469]
             # This returns an AlignmentSegment object from PySam
 
-            # TODO: Think carefully here -- A read could span more than one segment, right?!?
+            # TODO: Think carefully here -- Can a read span more than one segment?
+            # Maybe if the read is longer than the window? (Or significant indels / weird fusion alignment?)
             for aligned_segment in input_bam_object.fetch(contig=chrom, start=start_pos, end=stop_pos):
                 if aligned_segment.mapping_quality < quality_limit:
                     continue
@@ -322,9 +322,14 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                     assert aligned_segment.has_tag("MD")  # Location of mismatches (methylation)
                     assert aligned_segment.has_tag("YD")  # Bisulfite conversion strand label (f: OT/CTOT C->T or r: OB/CTOB G->A)
 
-                # TODO: We ignore paired/unpaired read status for now, and treat them the same
-                # Should we treat paired reads / overlapping reads differently?
+                    # Ensure each read is only seen once
+                    assert aligned_segment.query_name not in debug_read_name_to_row_number
+                    debug_read_name_to_row_number[aligned_segment.query_name + ("_1" if aligned_segment.is_read1 else "_2")] = read_number
 
+                # TODO: We ignore paired/unpaired read status for now. Should we treat paired reads / overlapping reads differently?
+
+
+                ## Read tags and ensure we're on the correct bisulfite-converted strand
                 bisulfite_parent_strand_is_reverse = None
                 if aligned_segment.has_tag("YD"):  # Biscuit tag
                     yd_tag = aligned_segment.get_tag("YD")
@@ -336,13 +341,11 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                         bisulfite_parent_strand_is_reverse = True
                 elif aligned_segment.has_tag("XB"):  # gem3 / blueprint tag
                     xb_tag = aligned_segment.get_tag("XB")  # XB:C = Forward / Reference was CG
-                    # TODO: Double check one or two of these gem3 tags manually.
                     if xb_tag == "C":
                         bisulfite_parent_strand_is_reverse = False
                     elif xb_tag == "G":  # XB:G = Reverse / Reference was GA
                         bisulfite_parent_strand_is_reverse = True
 
-                # TODO: Think about this old note of mine -- is this correct?
                 # We have paired-end reads; one half should (the "parent strand") has the methylation data.
                 # The other half (the "daughter strand") was the complement created by PCR, which we don't care about.
                 if bisulfite_parent_strand_is_reverse != aligned_segment.is_reverse:
@@ -361,17 +364,16 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                 #   An unmethylated C will be *changed* and read as T (pair A)
                 for query_pos, ref_pos in this_segment_cpgs:
                     query_base = aligned_segment.query_sequence[query_pos]
-                    # query_base2 = aligned_segment.get_forward_sequence()[query_pos] # raw off sequencer
-                    # query_base3 = aligned_segment.query_alignment_sequence[query_pos] # this needs to be offset by the soft clip
+                    # query_base_raw = aligned_segment.get_forward_sequence()[query_pos] # raw off sequencer
+                    # query_base_no_offset = aligned_segment.query_alignment_sequence[query_pos] # this needs to be offset by the soft clip
 
-                    # Store in our sparse array
-                    coo_row.append(next_coo_row_number)
-                    # instead of ref_pos, we want the index of the CpG in the list of CpGs
-                    # coo_col.append(ref_pos)
+                    # Store the read # in our sparse array
+                    coo_row.append(read_number)
 
+                    # Store the CpG site in our sparse array
                     # TODO: Object orient these inputs? -- lots of bad inheritence style here
                     coo_col.append(genomic_position_to_embedding(chr_to_cpg_to_embedding_dict, cpgs_per_chr_cumsum, chrom, ref_pos + 1))
-                    # coo_data.append(1 if query_base == "C" else 0)
+
                     if query_base == "C":
                         # Methylated
                         coo_data.append(1)
@@ -387,10 +389,8 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
                         if debug:
                             print(f"\t{query_pos} {ref_pos} C->{query_base} [Unknown! SNV? Indel?]")
 
-                assert aligned_segment.query_name not in read_name_to_row_number
+                read_number += 1
 
-                read_name_to_row_number[aligned_segment.query_name] = next_coo_row_number
-                next_coo_row_number += 1
                 if debug:
                     print("************************************************\n")
 
@@ -400,24 +400,21 @@ def extract_methylation_data_from_bam(input_bam, total_cpg_sites, chr_to_cpg_to_
 
     ## IIRC there's still a critical edge here, where sometimes we raise ValueError('row index exceeds matrix dimensions')
 
-    # Validity checks -- TODO: move elsewhere? to loader?
-    assert max(coo_data) <= 1
-    assert min(coo_data) >= -1
-
-    print("Debug info for coo_matrix dimensions:")
-    print(f"\tcoo_row: {len(coo_row):,}")
-    print(f"\tcoo row max: {max(coo_row):,}")
-    print(f"\tcoo_col: {len(coo_col):,}")
-    print(f"\tcoo col max: {max(coo_col):,}")
-    print(f"\tcoo_data: {len(coo_data):,}")
-    print(f"\tlen(read_name_to_row_number): {len(read_name_to_row_number):,}")
-    print(f"\ttotal_cpg_sites: {total_cpg_sites:,}")
+    if debug:
+        print("Debug info for coo_matrix dimensions:")
+        print(f"\tcoo_row: {len(coo_row):,}")
+        print(f"\tcoo row max: {max(coo_row):,}")
+        print(f"\tcoo_col: {len(coo_col):,}")
+        print(f"\tcoo col max: {max(coo_col):,}")
+        print(f"\tcoo_data: {len(coo_data):,}")
+        print(f"\tlen(read_name_to_row_number): {len(debug_read_name_to_row_number):,}")
+        print(f"\ttotal_cpg_sites: {total_cpg_sites:,}")
 
     # The size of the coo_matrix is:
     #   Number of rows = number of reads that pass our filters
     #   Number of columns = number of CpG sites
 
-    return scipy.sparse.coo_matrix((coo_data, (coo_row, coo_col)), shape=(next_coo_row_number, total_cpg_sites))
+    return scipy.sparse.coo_matrix((coo_data, (coo_row, coo_col)), shape=(read_number, total_cpg_sites))
 
     # return scipy.sparse.coo_matrix((coo_data, (coo_row, coo_col)), shape=(len(read_name_to_row_number) + 1, total_cpg_sites))
 
